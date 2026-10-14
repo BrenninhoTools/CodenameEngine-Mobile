@@ -66,6 +66,8 @@ class MainMenuState extends MusicBeatState
 			bg.antialiasing = true;
 		}
 
+		#if mobile Logs.trace('[MainMenu] Background ready, items: ${optionShit.join(", ")}', VERBOSE); #end
+
 		menuItems = new FlxTypedGroup<FlxSprite>();
 		add(menuItems);
 
@@ -79,6 +81,8 @@ class MainMenuState extends MusicBeatState
 			menuItem.antialiasing = true;
 		}
 
+		#if mobile Logs.trace('[MainMenu] Menu items ready', VERBOSE); #end
+
 		FlxG.camera.follow(camFollow, null, 0.06);
 
 		versionText = new FunkinText(5, FlxG.height - 2, 0, [
@@ -90,6 +94,7 @@ class MainMenuState extends MusicBeatState
 			''
 		].join('\n'));
 		versionText.y -= versionText.height;
+		#if mobile Logs.trace('[MainMenu] Version text ready', VERBOSE); #end
 		versionText.scrollFactor.set();
 		add(versionText);
 
@@ -115,7 +120,7 @@ class MainMenuState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
-		if (FlxG.sound.music.volume < 0.8)
+		if (FlxG.sound.music != null && FlxG.sound.music.volume < 0.8)
 			FlxG.sound.music.volume += 0.5 * elapsed;
 
 		if (!selectedSomethin)

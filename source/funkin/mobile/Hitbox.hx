@@ -16,7 +16,7 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 	public static var MODES:Array<String> = [MODE_LANES, MODE_ARROWS];
 
 	public static var ARROWS_SCALE:Float = 1.25;
-	public static var ARROWS_SPREAD:Float = 0.62;
+	public static var ARROWS_SPREAD:Float = 0.72;
 
 	public static var laneColors:Array<FlxColor> = [0xFFC24B99, 0xFF00FFFF, 0xFF12FA05, 0xFFF9393F];
 

@@ -187,6 +187,7 @@ class ModsFolder {
 	}
 
 	public static function registerFont(font:Font) {
+		if (font == null) return null;
 		var openflFont = new OpenFLFont();
 		@:privateAccess
 		openflFont.__fromLimeFont(font);
