@@ -12,7 +12,7 @@ concurrency:
 env:
   HAXE_VERSION: 4.3.7
   NDK_VERSION: r27c
-  LIBS_CACHE_VERSION: v1
+  LIBS_CACHE_VERSION: v2
   HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
 
 jobs:
@@ -78,16 +78,26 @@ jobs:
 
       - name: Configuring Lime for Android
         run: |
-          haxelib run lime setup -alias -y -nocffi
-          haxelib run lime config ANDROID_SDK $ANDROID_HOME
-          haxelib run lime config ANDROID_NDK_ROOT ${{ steps.setup-ndk.outputs.ndk-path }}
-          haxelib run lime config JAVA_HOME $JAVA_HOME
-          haxelib run lime config ANDROID_SETUP true
+          haxelib run lime config ANDROID_SDK $ANDROID_HOME -nocffi
+          haxelib run lime config ANDROID_NDK_ROOT ${{ steps.setup-ndk.outputs.ndk-path }} -nocffi
+          haxelib run lime config JAVA_HOME $JAVA_HOME -nocffi
+          haxelib run lime config ANDROID_SETUP true -nocffi
+
+      - name: Installing packages for building Lime
+        if: steps.libs-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -qq \
+          libegl1-mesa-dev libgl1-mesa-dev libibus-1.0-dev libdbus-1-dev libdecor-0-dev libudev-dev libgbm-dev libdrm-dev \
+          libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libglu1-mesa-dev libmbedtls-dev libuv1-dev libsqlite3-dev \
+          libx11-dev libxext-dev libxfixes-dev libxi-dev libxinerama-dev libxkbcommon-dev libxcursor-dev libxrandr-dev libxss-dev libxt-dev libxtst-dev libxv-dev libxxf86vm-dev \
+          libpulse-dev libasound2-dev libpipewire-0.3-dev
 
       - name: Rebuilding Lime and Hxcpp
         if: steps.libs-cache.outputs.cache-hit != 'true'
         run: |
-          haxelib run lime rebuild hxcpp
+          haxelib run lime rebuild hxcpp -nocffi
+          haxelib run lime rebuild linux -64 -release -nocolor -nocffi
           haxelib run lime rebuild tools
           haxelib run lime rebuild android -release -nocolor -arm64
 
@@ -181,7 +191,8 @@ jobs:
       - name: Rebuilding Lime and Hxcpp
         if: steps.libs-cache.outputs.cache-hit != 'true'
         run: |
-          haxelib run lime rebuild hxcpp
+          haxelib run lime rebuild hxcpp -nocffi
+          haxelib run lime rebuild mac -release -nocolor -nocffi
           haxelib run lime rebuild tools
           haxelib run lime rebuild ios -release -nocolor
 
@@ -193,9 +204,7 @@ jobs:
           key: ${{ steps.libs-cache.outputs.cache-primary-key }}
 
       - name: Building the game
-        run: |
-          haxelib run lime setup -alias -y -nocffi
-          haxelib run lime build ios -release -nosign -DCOMPILE_EXPERIMENTAL
+        run: haxelib run lime build ios -release -nosign -DCOMPILE_EXPERIMENTAL
 
       - name: Packaging the IPA
         run: |
