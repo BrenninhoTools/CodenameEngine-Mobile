@@ -147,8 +147,7 @@ jobs:
             KEYSTORE_PASSWORD=codename
             KEY_ALIAS=codename
             KEY_PASSWORD=codename
-            keytool -genkeypair -v -keystore keystore.jks -alias $KEY_ALIAS -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass $KEYSTORE_PASSWORD -keypass $KEY_PASSWORD -dname "CN=Codename Engine Mobile, O=BrenninhoTools, C=BR"
+            cp building/codename-mobile.keystore keystore.jks
           fi
 
           mkdir -p build
