@@ -131,7 +131,9 @@ class MusicBeatState extends FlxState implements IBeatCancellableReceiver
 		var className = Type.getClassName(Type.getClass(this));
 		if (stateScripts == null)
 			(stateScripts = new ScriptPack(className)).setParent(this);
-		if (scriptsAllowed) {
+		if (scriptsAllowed && funkin.backend.system.modules.AntiCrash.isStateScriptBlocked(className, this.scriptName)) {
+			Logs.trace('[AntiCrash] Skipping scripts for $className' + (this.scriptName != null ? ' (${this.scriptName})' : ''), WARNING);
+		} else if (scriptsAllowed) {
 			if (stateScripts.scripts.length == 0) {
 				var scriptName = this.scriptName != null ? this.scriptName : className.substr(className.lastIndexOf(".")+1);
 				for (i in funkin.backend.assets.ModsFolder.getLoadedMods()) {

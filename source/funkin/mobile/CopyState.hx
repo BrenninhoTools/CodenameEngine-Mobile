@@ -52,7 +52,16 @@ class CopyState extends FlxState
 	var progressBack:FlxSprite;
 
 	public static function getVersionKey():String
-		return funkin.backend.system.macros.GitCommitMacro.commitHash + "-" + lime.app.Application.current.meta.get("version");
+		return lime.app.Application.current.meta.get("version");
+
+	public static function getStartState():Class<FlxState>
+	{
+		#if android
+		if (!StorageUtil.hasStorageTypeSetting())
+			return StorageSetupState;
+		#end
+		return needsCopy() ? CopyState : MainState;
+	}
 
 	static function collectAssetLists()
 	{
@@ -92,7 +101,11 @@ class CopyState extends FlxState
 		var versionPath = StorageUtil.storageDirectory + VERSION_FILE;
 		try
 		{
-			return !FileSystem.exists(versionPath) || File.getContent(versionPath).trim() != getVersionKey();
+			if (!FileSystem.exists(versionPath))
+				return true;
+			var stored = File.getContent(versionPath).trim();
+			var key = getVersionKey();
+			return stored != key && !stored.endsWith("-" + key);
 		}
 		catch (e:Dynamic)
 		{
@@ -124,12 +137,16 @@ class CopyState extends FlxState
 		#if (sys && mobile)
 		if (isVersionOutdated() || StorageUtil.getPreviousDirectory() != null)
 			return true;
-		for (id in getFilesToCopy())
-			if (missing(id))
+		var files = getFilesToCopy();
+		var step = Std.int(Math.max(1, files.length / 40));
+		var i = 0;
+		while (i < files.length)
+		{
+			var id = files[i];
+			if (!StorageUtil.isFontAsset(id) && missing(id))
 				return true;
-		for (id in getBundledFiles())
-			if (missing(id))
-				return true;
+			i += step;
+		}
 		StorageUtil.saveCurrentDirectory();
 		#end
 		return false;
@@ -272,12 +289,7 @@ class CopyState extends FlxState
 			catch (e:Dynamic) {}
 		}
 
-		var migrationFailed = false;
-		for (job in failedJobs)
-			if (job.kind == MIGRATE)
-				migrationFailed = true;
-		if (!migrationFailed)
-			StorageUtil.saveCurrentDirectory();
+		StorageUtil.saveCurrentDirectory();
 		#end
 
 		_assetFiles = null;

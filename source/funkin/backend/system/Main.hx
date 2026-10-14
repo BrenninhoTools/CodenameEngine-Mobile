@@ -92,7 +92,7 @@ class Main extends Sprite
 		FakeCamera.instance = new FakeCamera();
 		FakeCallCamera.instance = new FakeCallCamera();
 
-		addChild(game = new FunkinGame(gameWidth, gameHeight, #if mobile funkin.mobile.CopyState.needsCopy() ? funkin.mobile.CopyState : #end MainState, Options.framerate, Options.framerate, skipSplash, startFullscreen));
+		addChild(game = new FunkinGame(gameWidth, gameHeight, #if mobile funkin.mobile.CopyState.getStartState() #else MainState #end, Options.framerate, Options.framerate, skipSplash, startFullscreen));
 
 		#if !web
 		addChild(framerateSprite = new Framerate());

@@ -165,6 +165,45 @@ class StorageUtil
 		#end
 	}
 
+	public static function hasStorageTypeSetting():Bool
+		return readSetting(STORAGE_TYPE_FILE) != null;
+
+	public static function hasExtractedAssets(?path:String):Bool
+	{
+		#if sys
+		if (path == null)
+			path = storageDirectory;
+		try
+		{
+			return path != null && FileSystem.exists(Path.addTrailingSlash(path) + ASSETS_FOLDER + "/.version");
+		}
+		catch (e:Dynamic) {}
+		#end
+		return false;
+	}
+
+	public static function hasStoragePermission():Bool
+	{
+		#if android
+		return AndroidStorage.hasStoragePermission();
+		#else
+		return true;
+		#end
+	}
+
+	public static function requestStoragePermission()
+	{
+		#if android
+		AndroidStorage.requestStoragePermission();
+		#end
+	}
+
+	public static function reload()
+	{
+		_storageDirectory = null;
+		init();
+	}
+
 	public static inline function needsRestart():Bool
 		return getStorageType() != activeStorageType;
 

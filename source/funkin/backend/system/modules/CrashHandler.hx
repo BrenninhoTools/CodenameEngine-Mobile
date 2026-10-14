@@ -57,8 +57,12 @@ final class CrashHandler {
 		e.preventDefault();
 		e.stopPropagation();
 		e.stopImmediatePropagation();
-		FlxG.mouse.visible = true;
 		if (blocking) return;
+		if (AntiCrash.enabled) {
+			AntiCrash.handleError(e.error, "event");
+			return;
+		}
+		FlxG.mouse.visible = true;
 		present(describe(e.error), CallStack.exceptionStack());
 	}
 
@@ -66,7 +70,7 @@ final class CrashHandler {
 	static function onError(message:Dynamic):Void {
 		// hxcpp shows a native dialog and calls exit(1) if this handler returns.
 		// A normal throw skips that and comes back through onUncaughtError.
-		if (!blocking)
+		if (!blocking && !AntiCrash.enabled)
 			present(Std.string(message), CallStack.exceptionStack());
 		throw Std.string(message);
 	}

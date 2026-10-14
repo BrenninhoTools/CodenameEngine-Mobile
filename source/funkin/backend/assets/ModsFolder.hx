@@ -64,6 +64,7 @@ class ModsFolder {
 	 */
 	public static function switchMod(mod:String) {
 		Options.lastLoadedMod = currentModFolder = mod;
+		funkin.backend.system.modules.AntiCrash.reset();
 		reloadMods();
 		if(mod == null) {
 			mod = "(default)";

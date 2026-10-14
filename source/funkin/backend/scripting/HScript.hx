@@ -128,6 +128,8 @@ class HScript extends Script {
 			if (err.startsWith(fn)) err = err.substr(fn.length);
 		}
 
+		if (!funkin.backend.system.modules.AntiCrash.onScriptError(this, err))
+			return;
 		Logs.traceColored([
 			Logs.logText(fn, GREEN),
 			Logs.logText(err, RED)
@@ -200,8 +202,15 @@ class HScript extends Script {
 		if (interp == null) return null;
 
 		var func = interp.variables.get(funcName);
-		if (func != null && Reflect.isFunction(func))
-			return Reflect.callMethod(null, func, parameters == null ? Script._EMPTY_ARGS : parameters);
+		if (func != null && Reflect.isFunction(func)) {
+			try {
+				return Reflect.callMethod(null, func, parameters == null ? Script._EMPTY_ARGS : parameters);
+			} catch (e:Error) {
+				_errorHandler(e);
+			} catch (e:Dynamic) {
+				_errorHandler(new Error(ECustom('$funcName: ${Std.string(e)}'), 0, 0, fileName, 0));
+			}
+		}
 
 		return null;
 	}

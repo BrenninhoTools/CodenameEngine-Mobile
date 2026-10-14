@@ -2,6 +2,7 @@ package funkin.backend.system;
 
 import flixel.FlxGame;
 import flixel.FlxG;
+import funkin.backend.system.modules.AntiCrash;
 import funkin.backend.system.modules.CrashHandler;
 import openfl.events.KeyboardEvent;
 import openfl.events.Event;
@@ -28,7 +29,22 @@ class FunkinGame extends FlxGame {
 	#end
 	
 	public override function switchState() {
-		super.switchState();
+		var attempts = 0;
+		while (true) {
+			try {
+				super.switchState();
+				break;
+			} catch (e:Dynamic) {
+				var failed = _state;
+				attempts++;
+				if (attempts > 3 || !AntiCrash.handleStateCreateError(e, failed) || _nextState == null)
+					throw e;
+				try {
+					if (failed != null) failed.destroy();
+				} catch (_:Dynamic) {}
+				_state = null;
+			}
+		}
 		// draw once to put all images in gpu then put the last update time to now to prevent lag spikes or whatever
 		draw();
 		ticks = getTicks();
@@ -56,6 +72,25 @@ class FunkinGame extends FlxGame {
 		super.__enterFrame(deltaTime);
 	}
 
+
+	override function step(deltaTime:Float):Void {
+		try {
+			super.step(deltaTime);
+		} catch (e:Dynamic) {
+			AntiCrash.handleError(e, "update");
+		}
+	}
+
+	override function draw():Void {
+		try {
+			super.draw();
+		} catch (e:Dynamic) {
+			try {
+				FlxG.cameras.unlock();
+			} catch (_:Dynamic) {}
+			AntiCrash.handleError(e, "draw");
+		}
+	}
 
 	override public function onFocus(_):Void {
 		if (manualPause) return;
