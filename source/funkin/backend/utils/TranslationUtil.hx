@@ -254,7 +254,19 @@ final class TranslationUtil
 
 		// todo make it load the default languages in a second string map
 
-		for(mod in ModsFolder.getLoadedModsLibs(true)) for(file in mod.getFiles("assets/" + mainPath).sortAlphabetically().map((v)->'$mainPath/$v')) {
+		var languageFiles:Array<String> = [];
+		for(mod in ModsFolder.getLoadedModsLibs(true)) for(file in mod.getFiles("assets/" + mainPath).sortAlphabetically().map((v)->'$mainPath/$v'))
+			languageFiles.push(file);
+
+		#if mobile
+		if (languageFiles.length == 0) {
+			var folderPrefix = "assets/" + mainPath + "/";
+			var embeddedFiles = [for (id in lime.utils.Assets.list()) if (id.startsWith(folderPrefix) && id.indexOf("/", folderPrefix.length) == -1) id.substr(7)];
+			for (file in embeddedFiles.sortAlphabetically()) languageFiles.push(file);
+		}
+		#end
+
+		for(file in languageFiles) {
 			if(Path.extension(file).toLowerCase() != "xml") continue;
 
 			// Parse the XML
