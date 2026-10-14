@@ -12,7 +12,7 @@ concurrency:
 env:
   HAXE_VERSION: 4.3.7
   NDK_VERSION: r27c
-  LIBS_CACHE_VERSION: v2
+  LIBS_CACHE_VERSION: v3
   HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
 
 jobs:
@@ -37,7 +37,8 @@ jobs:
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: ${{ env.NDK_VERSION }}
-          local-cache: true
+          add-to-path: false
+          local-cache: false
 
       - name: Setting up Haxe
         uses: krdlab/setup-haxe@v2
@@ -78,6 +79,12 @@ jobs:
 
       - name: Configuring Lime for Android
         run: |
+          NDK=${{ steps.setup-ndk.outputs.ndk-path }}
+          echo "ANDROID_NDK_ROOT=$NDK" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$NDK" >> $GITHUB_ENV
+          echo "ANDROID_HOST=linux-x86_64" >> $GITHUB_ENV
+          echo "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+          ls $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++
           haxelib run lime config ANDROID_SDK $ANDROID_HOME -nocffi
           haxelib run lime config ANDROID_NDK_ROOT ${{ steps.setup-ndk.outputs.ndk-path }} -nocffi
           haxelib run lime config JAVA_HOME $JAVA_HOME -nocffi
