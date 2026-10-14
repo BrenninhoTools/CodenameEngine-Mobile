@@ -26,10 +26,6 @@ import openfl.text.TextFormat;
 import openfl.utils.AssetLibrary;
 import sys.FileSystem;
 import sys.io.File;
-#if android
-import extension.androidtools.content.Context;
-import extension.androidtools.os.Build;
-#end
 
 #if IMGUI_ENABLED
 import lime.tools.imgui.ImGuiFlags;
@@ -280,10 +276,8 @@ class Main extends Sprite
 		if (!noCwdFix && !sys.FileSystem.exists('manifest/default.json')) {
 			Sys.setCwd(haxe.io.Path.directory(Sys.programPath()));
 		}
-		#elseif android
-		Sys.setCwd(haxe.io.Path.addTrailingSlash(VERSION.SDK_INT > 30 ? Context.getObbDir() : Context.getExternalFilesDir()));
-		#elseif (ios || switch)
-		Sys.setCwd(haxe.io.Path.addTrailingSlash(openfl.filesystem.File.applicationStorageDirectory.nativePath));
+		#elseif (mobile || switch)
+		StorageUtil.init();
 		#end
 	}
 

@@ -5,9 +5,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   HAXE_VERSION: 4.3.7
   NDK_VERSION: r27c
+  LIBS_CACHE_VERSION: v1
   HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
 
 jobs:
@@ -32,14 +37,41 @@ jobs:
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: ${{ env.NDK_VERSION }}
-          local-cache: false
+          local-cache: true
 
       - name: Setting up Haxe
         uses: krdlab/setup-haxe@v2
         with:
           haxe-version: ${{ env.HAXE_VERSION }}
 
-      - name: Installing/Updating libraries
+      - name: Using every CPU core
+        run: echo "HXCPP_COMPILE_THREADS=$(nproc)" >> $GITHUB_ENV
+
+      - name: Restoring libraries
+        id: libs-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .haxelib
+          key: libs-android-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml') }}
+
+      - name: Restoring compile cache
+        uses: actions/cache@v6
+        with:
+          path: .hxcpp_cache
+          key: hxcpp-android-${{ github.run_id }}
+          restore-keys: hxcpp-android-
+
+      - name: Restoring Gradle cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-android-${{ hashFiles('project.xml') }}
+          restore-keys: gradle-android-
+
+      - name: Installing libraries
+        if: steps.libs-cache.outputs.cache-hit != 'true'
         run: |
           haxelib --global update haxelib
           haxe -cp commandline -D analyzer-optimize --run Main setup -si
@@ -52,12 +84,22 @@ jobs:
           haxelib run lime config JAVA_HOME $JAVA_HOME
           haxelib run lime config ANDROID_SETUP true
 
-      - name: Building the game
+      - name: Rebuilding Lime and Hxcpp
+        if: steps.libs-cache.outputs.cache-hit != 'true'
         run: |
           haxelib run lime rebuild hxcpp
           haxelib run lime rebuild tools
           haxelib run lime rebuild android -release -nocolor -arm64
-          haxelib run lime build android -release -arm64 -DCOMPILE_EXPERIMENTAL
+
+      - name: Saving libraries
+        if: steps.libs-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .haxelib
+          key: ${{ steps.libs-cache.outputs.cache-primary-key }}
+
+      - name: Building the game
+        run: haxelib run lime build android -release -arm64 -DCOMPILE_EXPERIMENTAL
 
       - name: Signing the APK
         env:
@@ -96,6 +138,7 @@ jobs:
           name: Codename Engine Android (ARM64)
           path: build/CodenameEngine-arm64.apk
           if-no-files-found: error
+          compression-level: 0
 
   ios:
     name: iOS Build
@@ -112,17 +155,46 @@ jobs:
         with:
           haxe-version: ${{ env.HAXE_VERSION }}
 
-      - name: Installing/Updating libraries
+      - name: Using every CPU core
+        run: echo "HXCPP_COMPILE_THREADS=$(sysctl -n hw.ncpu)" >> $GITHUB_ENV
+
+      - name: Restoring libraries
+        id: libs-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .haxelib
+          key: libs-ios-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml') }}
+
+      - name: Restoring compile cache
+        uses: actions/cache@v6
+        with:
+          path: .hxcpp_cache
+          key: hxcpp-ios-${{ github.run_id }}
+          restore-keys: hxcpp-ios-
+
+      - name: Installing libraries
+        if: steps.libs-cache.outputs.cache-hit != 'true'
         run: |
           haxelib --global update haxelib
           haxe -cp commandline -D analyzer-optimize --run Main setup -si
 
-      - name: Building the game
+      - name: Rebuilding Lime and Hxcpp
+        if: steps.libs-cache.outputs.cache-hit != 'true'
         run: |
-          haxelib run lime setup -alias -y -nocffi
           haxelib run lime rebuild hxcpp
           haxelib run lime rebuild tools
           haxelib run lime rebuild ios -release -nocolor
+
+      - name: Saving libraries
+        if: steps.libs-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .haxelib
+          key: ${{ steps.libs-cache.outputs.cache-primary-key }}
+
+      - name: Building the game
+        run: |
+          haxelib run lime setup -alias -y -nocffi
           haxelib run lime build ios -release -nosign -DCOMPILE_EXPERIMENTAL
 
       - name: Packaging the IPA
@@ -143,3 +215,4 @@ jobs:
           name: Codename Engine iOS
           path: build/CodenameEngine.ipa
           if-no-files-found: error
+          compression-level: 0
