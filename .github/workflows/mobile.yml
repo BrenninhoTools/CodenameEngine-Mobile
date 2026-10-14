@@ -12,7 +12,7 @@ concurrency:
 env:
   HAXE_VERSION: 4.3.7
   NDK_VERSION: r27c
-  LIBS_CACHE_VERSION: v4
+  LIBS_CACHE_VERSION: v5
   HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
 
 jobs:
