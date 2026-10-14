@@ -194,7 +194,8 @@ class Main extends Sprite
 
 	static function updateMobileFramerateScale() {
 		if (framerateSprite == null || Lib.current.stage == null) return;
-		var scale = Math.max(1, Math.min(Lib.current.stage.stageWidth / 1280, Lib.current.stage.stageHeight / 720) * 1.15);
+		Framerate.offset.x = 24;
+		var scale = Math.max(0.75, Math.min(Lib.current.stage.stageWidth / 1280, Lib.current.stage.stageHeight / 720) * 0.9);
 		framerateSprite.scaleX = framerateSprite.scaleY = scale;
 	}
 

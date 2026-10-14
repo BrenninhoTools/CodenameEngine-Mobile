@@ -8,6 +8,7 @@ import funkin.backend.scripting.events.menu.MenuChangeEvent;
 import funkin.backend.scripting.events.NameEvent;
 import funkin.menus.credits.CreditsMain;
 import funkin.options.OptionsMenu;
+import flixel.graphics.frames.FlxFramesCollection;
 import funkin.mobile.MobileButton;
 import funkin.mobile.TouchUtil;
 import lime.app.Application;
@@ -68,11 +69,7 @@ class MainMenuState extends MusicBeatState
 
 		for (i=>option in optionShit)
 		{
-			var menuItem:FlxSprite = new FlxSprite(0, 60 + (i * 160));
-			menuItem.frames = Paths.getFrames('menus/mainmenu/${option}');
-			menuItem.animation.addByPrefix('idle', option + " basic", 24);
-			menuItem.animation.addByPrefix('selected', option + " white", 24);
-			menuItem.animation.play('idle');
+			var menuItem:FlxSprite = createMenuItem(option, 60 + (i * 160));
 			menuItem.ID = i;
 			menuItem.screenCenter(X);
 			menuItems.add(menuItem);
@@ -220,6 +217,57 @@ class MainMenuState extends MusicBeatState
 			}
 		});
 	}
+	function createMenuItem(option:String, y:Float):FlxSprite
+	{
+		var frames:FlxFramesCollection = null;
+		try {
+			frames = Paths.getFrames('menus/mainmenu/${option}');
+		} catch (e:Dynamic) {
+			frames = null;
+		}
+		if (!hasPrefix(frames, option + " basic"))
+		{
+			var baseFrames = loadBaseFrames(option);
+			if (baseFrames != null) frames = baseFrames;
+		}
+
+		if (hasPrefix(frames, option + " basic"))
+		{
+			var menuItem:FlxSprite = new FlxSprite(0, y);
+			menuItem.frames = frames;
+			menuItem.animation.addByPrefix('idle', option + " basic", 24);
+			menuItem.animation.addByPrefix('selected', option + " white", 24);
+			menuItem.animation.play('idle');
+			return menuItem;
+		}
+
+		Logs.trace('Missing main menu sprite for "$option", using text instead', WARNING);
+		return new Alphabet(0, y, option.toUpperCase(), "bold");
+	}
+
+	function hasPrefix(frames:FlxFramesCollection, prefix:String):Bool
+	{
+		if (frames == null || frames.frames == null) return false;
+		for (frame in frames.frames)
+			if (frame != null && frame.name != null && frame.name.startsWith(prefix))
+				return true;
+		return false;
+	}
+
+	function loadBaseFrames(option:String):FlxFramesCollection
+	{
+		try {
+			var path = 'assets/images/menus/mainmenu/$option';
+			var image:lime.graphics.Image = Paths.assetsTree.getSpecificAsset('$path.png', "IMAGE", funkin.backend.assets.AssetSource.SOURCE);
+			var xml:String = Paths.assetsTree.getSpecificAsset('$path.xml', "TEXT", funkin.backend.assets.AssetSource.SOURCE);
+			if (image == null || xml == null) return null;
+			var graphic = flixel.graphics.FlxGraphic.fromBitmapData(openfl.display.BitmapData.fromImage(image), false, 'mainmenu-base-$option');
+			return flixel.graphics.frames.FlxAtlasFrames.fromSparrow(graphic, xml);
+		} catch (e:Dynamic) {
+			return null;
+		}
+	}
+
 	function changeItem(huh:Int = 0)
 	{
 		if (menuItems == null || menuItems.length == 0) return;
@@ -233,11 +281,13 @@ class MainMenuState extends MusicBeatState
 
 		menuItems.forEach(function(spr:FlxSprite)
 		{
-			spr.animation.play('idle');
+			if (spr.animation.exists('idle')) spr.animation.play('idle');
+			else spr.alpha = 0.6;
 
 			if (spr.ID == curSelected)
 			{
-				spr.animation.play('selected');
+				if (spr.animation.exists('selected')) spr.animation.play('selected');
+				else spr.alpha = 1;
 				var mid = spr.getGraphicMidpoint();
 				camFollow.setPosition(mid.x, mid.y);
 				mid.put();
