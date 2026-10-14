@@ -41,6 +41,13 @@ class OptionsMenu extends TreeMenu {
 			state: LanguageOptions
 		},
 		#end
+		#if mobile
+		{
+			name: 'optionsTree.mobile-name',
+			desc: 'optionsTree.mobile-desc',
+			state: MobileOptions
+		},
+		#end
 		{
 			name: 'optionsTree.miscellaneous-name',
 			desc: 'optionsTree.miscellaneous-desc',

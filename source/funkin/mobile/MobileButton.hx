@@ -49,7 +49,7 @@ class MobileButton extends FlxSprite
 
 	public static function createBack(?camera:FlxCamera):MobileButton
 	{
-		var button = new MobileButton(0, 0, 'mobile/backButton', 'back', 0.5);
+		var button = new MobileButton(0, 0, 'mobile/backButton', 'back', 0.65);
 		button.x = FlxG.width - button.width - 10;
 		button.y = FlxG.height - button.height - 10;
 		if (camera != null)

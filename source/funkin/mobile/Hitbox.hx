@@ -19,6 +19,8 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 	var justReleasedLanes:Array<Bool> = [];
 	var lastPressedLanes:Array<Bool> = [];
 
+	var touchLanes:Map<Int, Int> = new Map();
+
 	var lastFrame:Int = -1;
 	var updateFrame:Int = 0;
 
@@ -81,27 +83,18 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 			justReleasedLanes[i] = false;
 		}
 
+		var currentLanes:Map<Int, Int> = new Map();
+
 		#if FLX_TOUCH
 		for (touch in FlxG.touches.list)
-		{
-			var lane = getLane(touch.gameX, touch.gameY);
-			if (lane < 0)
-				continue;
-			if (touch.pressed)
-				pressedLanes[lane] = true;
-			if (touch.justPressed)
-				justPressedLanes[lane] = true;
-		}
+			if (touch.pressed || touch.justPressed)
+				processPointer(touch.touchPointID, touch.gameX, touch.gameY, touch.justPressed, currentLanes);
 		#elseif FLX_MOUSE
-		var lane = getLane(FlxG.mouse.gameX, FlxG.mouse.gameY);
-		if (lane >= 0)
-		{
-			if (FlxG.mouse.pressed)
-				pressedLanes[lane] = true;
-			if (FlxG.mouse.justPressed)
-				justPressedLanes[lane] = true;
-		}
+		if (FlxG.mouse.pressed || FlxG.mouse.justPressed)
+			processPointer(-1, FlxG.mouse.gameX, FlxG.mouse.gameY, FlxG.mouse.justPressed, currentLanes);
 		#end
+
+		touchLanes = currentLanes;
 
 		for (i in 0...keyCount)
 		{
@@ -110,6 +103,19 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 			if (lastPressedLanes[i] && !pressedLanes[i])
 				justReleasedLanes[i] = true;
 		}
+	}
+
+	function processPointer(id:Int, x:Float, y:Float, justPressed:Bool, currentLanes:Map<Int, Int>)
+	{
+		var lane = getLane(x, y);
+		if (lane < 0)
+			return;
+
+		var previousLane = touchLanes.get(id);
+		pressedLanes[lane] = true;
+		if ((justPressed || previousLane == null || previousLane != lane) && !lastPressedLanes[lane])
+			justPressedLanes[lane] = true;
+		currentLanes.set(id, lane);
 	}
 
 	function getLane(x:Float, y:Float):Int
@@ -159,7 +165,7 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 		{
 			if (hint == null)
 				continue;
-			if (pressed(i))
+			if (pressed(i) && !Options.invisibleHitbox)
 				hint.alpha = hintAlpha;
 			else if (hint.alpha > 0)
 				hint.alpha = Math.max(0, hint.alpha - elapsed * 3);

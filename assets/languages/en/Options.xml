@@ -21,6 +21,9 @@
 		<str id="optionsTree.language-name">Language</str>
 		<str id="optionsTree.language-desc">Change the language that the engine uses.</str>
 
+		<str id="optionsTree.mobile-name">Mobile Options</str>
+		<str id="optionsTree.mobile-desc">Change mobile options such as the Hitbox.</str>
+
 		<str id="optionsTree.miscellaneous-name">Miscellaneous</str>
 		<str id="optionsTree.miscellaneous-desc">Use this menu to reset save data or engine settings.</str>
 
@@ -169,6 +172,11 @@
 	<group name="LanguageOptions" prefix="LanguageOptions.">
 		<str id="language-name">Language</str>
 		<str id="language-desc">Language by {0} (Version: {1})</str>
+	</group>
+
+	<group name="MobileOptions" prefix="MobileOptions.">
+		<str id="invisibleHitbox-name">Invisible Hitbox</str>
+		<str id="invisibleHitbox-desc">If checked, the hitbox lanes will not light up when you touch them.</str>
 	</group>
 
 	<group name="MiscOptions" prefix="MiscOptions.">
