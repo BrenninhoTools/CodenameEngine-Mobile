@@ -39,6 +39,7 @@ class Options
 	public static var fpsCounterStats:Bool = true;
 	public static var autoPause:Bool = true;
 	public static var invisibleHitbox:Bool = false;
+	@:doNotSave public static var storageType:String = "Data";
 	public static var antialiasing:Bool = true;
 	public static var volume:Float = 1;
 	public static var volumeMusic:Float = 1;
