@@ -4,6 +4,7 @@ import flixel.group.FlxSpriteGroup;
 import flixel.util.FlxSignal;
 import funkin.backend.system.Controls;
 import funkin.backend.TurboControls;
+import funkin.mobile.TouchUtil;
 import funkin.options.TreeMenu.ITreeOption;
 import funkin.options.TreeMenu.ITreeFloatOption;
 import funkin.options.type.OptionType;
@@ -94,8 +95,8 @@ class TreeMenuScreen extends FlxSpriteGroup {
 		if (inputEnabled) {
 			for (basic in turboBasics) basic.update(elapsed);
 
-			var change = (upTurboControl.activated ? -1 : 0) + (downTurboControl.activated ? 1 : 0) - FlxG.mouse.wheel, mouseControl = false;
-			if (FlxG.mouse.justPressed) {
+			var change = (upTurboControl.activated ? -1 : 0) + (downTurboControl.activated ? 1 : 0) - FlxG.mouse.wheel + TouchUtil.verticalScroll, mouseControl = false;
+			if (TouchUtil.tapped) {
 				for (i in CoolUtil.maxInt(curSelected - 3, 0)...CoolUtil.minInt(curSelected + 4, length))
 					if (i != curSelected && members[i] != null && mouseOverlaps(members[i])) {
 						change = i - curSelected;
@@ -106,18 +107,18 @@ class TreeMenuScreen extends FlxSpriteGroup {
 			changeSelection(change);
 
 			if (length > 0 && curOption != null) {
-				if (controls.ACCEPT || (!mouseControl && FlxG.mouse.justPressed && mouseOverlaps(members[curSelected]))) curOption.select();
+				if (controls.ACCEPT || (!mouseControl && TouchUtil.tapped && mouseOverlaps(members[curSelected]))) curOption.select();
 				if (curFloatOption != null) {
 					if (controls.LEFT) curFloatOption.changeValue(-elapsed);
 					if (controls.RIGHT) curFloatOption.changeValue(elapsed);
 				}
 				else {
-					if (leftTurboControl.activated) curOption.changeSelection(-1);
-					if (rightTurboControl.activated) curOption.changeSelection(1);
+					if (leftTurboControl.activated || TouchUtil.swipeLeft) curOption.changeSelection(-1);
+					if (rightTurboControl.activated || TouchUtil.swipeRight) curOption.changeSelection(1);
 				}
 			}
 
-			if (controls.BACK || (FlxG.mouse.justPressedRight && Main.timeSinceFocus > 0.3)) close();
+			if (controls.BACK || (FlxG.mouse.justPressedRight && Main.timeSinceFocus > 0.3) || (parent != null && parent.mobileBackPressed)) close();
 		}
 
 		updateItems();

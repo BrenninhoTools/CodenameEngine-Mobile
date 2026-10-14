@@ -38,7 +38,7 @@ class Cutscene extends MusicBeatSubstate {
 	}
 
 	public function pauseCheck():Bool
-		return controls.PAUSE && pausable;
+		return (controls.PAUSE || (game != null && game.mobilePauseButton != null && game.mobilePauseButton.justPressed)) && pausable;
 
 	var _before:Array<Bool> = [false, true];
 	public function pauseCutscene() {

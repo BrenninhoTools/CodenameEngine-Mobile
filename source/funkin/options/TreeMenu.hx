@@ -76,6 +76,8 @@ class TreeMenu extends UIState {
 		add(titleLabel);
 		add(descLabel);
 
+		addBackButton();
+
 		FlxG.camera.scroll.x = -FlxG.width;
 		menuChanged();
 

@@ -44,11 +44,13 @@ typedef ConsoleSegment = {
 
 class ConsoleUI {
 
+	#if IMGUI_ENABLED
 	static final CONSOLE_BG_COLOR = new ImGuiFloat3Ptr(0.22, 0.0, 0.32);
 	static final SEARCH_HIGHLIGHT_COLOR = new ImGuiFloat3Ptr(0.0, 1.0, 0.0);
 	static final SEARCH_SELECTED_COLOR = new ImGuiFloat3Ptr(0.888, 0.83, 0.008);
 	static final SEARCH_DESC_COLOR = new ImGuiFloat3Ptr(0.6, 0.6, 0.6);
 	static final SEARCH_ARGS_COLOR = new ImGuiFloat3Ptr(0.35, 0.5, 0.31);
+	#end
 
 	static final CONSOLE_MAX_OUPUT = 100;
 	static final SEARCH_MAX_OUTPUT = 25;
@@ -227,6 +229,7 @@ class ConsoleUI {
 		GRAY, BLUE, GREEN, CYAN, RED, MAGENTA, YELLOW, WHITE
 	];
 
+	#if IMGUI_ENABLED
 	public static final consoleColors:Map<ConsoleColor, ImGuiFloat3Ptr> = [
 		BLACK 			=> new ImGuiFloat3Ptr(0.0, 0.0, 0.0),
 		DARKBLUE 		=> new ImGuiFloat3Ptr(0.04, 0.04, 0.76),
@@ -250,6 +253,7 @@ class ConsoleUI {
 	public static function consoleColorToImColor(color:ConsoleColor) {
 		return (consoleColors.get(color) ?? consoleColors.get(WHITE)).toImColor();
 	}
+	#end
 
 	public function displayUI() {
 		#if IMGUI_ENABLED

@@ -7,6 +7,7 @@ import flixel.math.FlxPoint;
 import funkin.backend.system.framerate.Framerate;
 import funkin.backend.assets.ModsFolder;
 import funkin.backend.FunkinText;
+import funkin.mobile.TouchUtil;
 import haxe.io.Path;
 import sys.FileSystem;
 
@@ -145,6 +146,8 @@ class ModSwitchMenu extends MusicBeatSubstate {
 		changeSelection(0, true);
 		if (addons.length > 0)
 			changeAddon(0, true);
+
+		addBackButton();
 	}
 
 	public override function update(elapsed:Float) {
@@ -159,7 +162,7 @@ class ModSwitchMenu extends MusicBeatSubstate {
 			targetFramerateY = ((desc.text != "") ? desc.y + desc.height : title.y + title.height);
 		Framerate.offset.y = CoolUtil.fpsLerp(Framerate.offset.y, targetFramerateY, 0.35);
 
-		var scrollChange = (controls.DOWN_P ? 1 : 0) + (controls.UP_P ? -1 : 0) - FlxG.mouse.wheel;
+		var scrollChange = (controls.DOWN_P ? 1 : 0) + (controls.UP_P ? -1 : 0) - FlxG.mouse.wheel + TouchUtil.verticalScroll;
 		(inAddons ? addonControls : regularControls)(scrollChange);
 
 		for (i => check in addonChecks.members) {
@@ -185,7 +188,18 @@ class ModSwitchMenu extends MusicBeatSubstate {
 	function regularControls(scrollChange:Int) {
 		changeSelection(scrollChange);
 
-		if (controls.ACCEPT) {
+		var touchAccept = false;
+		if (TouchUtil.tapped) {
+			for (index => item in alphabets.members) {
+				if (item != null && TouchUtil.overlaps(item, subCam)) {
+					if (index != curSelected) changeSelection(index - curSelected);
+					else touchAccept = true;
+					break;
+				}
+			}
+		}
+
+		if (controls.ACCEPT || touchAccept) {
 			var newAddonsOff:Array<String> = [];
 			for (i => isOff in queuedAddonsOff) {
 				if (isOff)
@@ -197,16 +211,27 @@ class ModSwitchMenu extends MusicBeatSubstate {
 			close();
 		}
 
-		if (controls.BACK) {
+		if (controls.BACK || mobileBackPressed) {
 			close();
 			Framerate.offset.y = 0;
-		} else if (controls.CHANGE_MODE && addons.length > 0)
+		} else if ((controls.CHANGE_MODE || TouchUtil.swipeLeft || TouchUtil.tappedOn(keyInfo, subCam)) && addons.length > 0)
 			toggleTab(false);
 	}
 	function addonControls(scrollChange:Int) {
 		changeAddon(scrollChange);
 
-		if (controls.ACCEPT) {
+		var touchToggle = false;
+		if (TouchUtil.tapped) {
+			for (index => item in addonObjs.members) {
+				if (item != null && (TouchUtil.overlaps(item, subCam) || TouchUtil.overlaps(addonChecks.members[index], subCam))) {
+					if (index != curAddon) changeAddon(index - curAddon);
+					else touchToggle = true;
+					break;
+				}
+			}
+		}
+
+		if (controls.ACCEPT || touchToggle) {
 			queuedAddonsOff[curAddon] = !queuedAddonsOff[curAddon];
 			addonChecks.members[curAddon].animation.play(queuedAddonsOff[curAddon] ? "unchecking" : "checking", true);
 
@@ -214,8 +239,8 @@ class ModSwitchMenu extends MusicBeatSubstate {
 			CoolUtil.playMenuSFX(queuedAddonsOff[curAddon] ? UNCHECKED : CHECKED);
 		}
 
-		if (controls.CHANGE_MODE || controls.BACK)
-			toggleTab(controls.BACK);
+		if (controls.CHANGE_MODE || controls.BACK || mobileBackPressed || TouchUtil.swipeRight || TouchUtil.tappedOn(keyInfo, subCam))
+			toggleTab(controls.BACK || mobileBackPressed);
 	}
 
 	public function changeSelection(change:Int, force:Bool = false) {

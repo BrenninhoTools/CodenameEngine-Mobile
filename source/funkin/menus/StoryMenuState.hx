@@ -11,6 +11,7 @@ import funkin.backend.scripting.events.CancellableEvent;
 import funkin.backend.scripting.events.menu.MenuChangeEvent;
 import funkin.backend.scripting.events.menu.storymenu.*;
 import funkin.backend.week.*;
+import funkin.mobile.TouchUtil;
 import funkin.savedata.FunkinSave;
 import haxe.io.Path;
 import haxe.xml.Access;
@@ -133,6 +134,8 @@ class StoryMenuState extends MusicBeatState {
 
 		DiscordUtil.call("onMenuLoaded", ["Story Menu"]);
 		CoolUtil.playMenuSong();
+
+		addBackButton();
 	}
 
 	var __lastDifficultyTween:FlxTween;
@@ -143,30 +146,33 @@ class StoryMenuState extends MusicBeatState {
 		scoreText.text = TU.translate("story.score", [Math.round(lerpScore)]);
 
 		if (canSelect) {
-			if (leftArrow != null && leftArrow.exists) leftArrow.animation.play(controls.LEFT ? 'press' : 'idle');
-			if (rightArrow != null && rightArrow.exists) rightArrow.animation.play(controls.RIGHT ? 'press' : 'idle');
+			if (leftArrow != null && leftArrow.exists) leftArrow.animation.play(controls.LEFT || (TouchUtil.pressed && TouchUtil.overlaps(leftArrow)) ? 'press' : 'idle');
+			if (rightArrow != null && rightArrow.exists) rightArrow.animation.play(controls.RIGHT || (TouchUtil.pressed && TouchUtil.overlaps(rightArrow)) ? 'press' : 'idle');
 
-			if (controls.BACK || FlxG.mouse.justPressedRight) {
+			if (controls.BACK || FlxG.mouse.justPressedRight || mobileBackPressed) {
 				goBack();
 			}
 
-			changeDifficulty((controls.LEFT_P ? -1 : 0) + (controls.RIGHT_P ? 1 : 0));
-			changeWeek((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - FlxG.mouse.wheel);
+			changeDifficulty((controls.LEFT_P ? -1 : 0) + (controls.RIGHT_P ? 1 : 0) + (TouchUtil.swipeLeft ? -1 : 0) + (TouchUtil.swipeRight ? 1 : 0));
+			changeWeek((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - FlxG.mouse.wheel + TouchUtil.verticalScroll);
 
-			if (FlxG.mouse.justPressed) {
-				if (leftArrow != null && leftArrow.exists && FlxG.mouse.overlaps(leftArrow)) {
+			if (TouchUtil.tapped) {
+				if (leftArrow != null && leftArrow.exists && TouchUtil.overlaps(leftArrow)) {
 					leftArrow.animation.play('press');
 					changeDifficulty(-1);
 				}
-				else if (rightArrow != null && rightArrow.exists && FlxG.mouse.overlaps(rightArrow)) {
+				else if (rightArrow != null && rightArrow.exists && TouchUtil.overlaps(rightArrow)) {
 					rightArrow.animation.play('press');
 					changeDifficulty(1);
 				}
-				else if (weekSprites?.members[curWeek] != null && FlxG.mouse.overlaps(weekSprites.members[curWeek])) {
+				else if (weekSprites?.members[curWeek] != null && TouchUtil.overlaps(weekSprites.members[curWeek])) {
 					selectWeek();
 				}
-				else if (weekSprites?.members[curWeek + 1] != null && FlxG.mouse.overlaps(weekSprites.members[curWeek + 1])) {
+				else if (weekSprites?.members[curWeek + 1] != null && TouchUtil.overlaps(weekSprites.members[curWeek + 1])) {
 					changeWeek(1);
+				}
+				else if (curWeek > 0 && weekSprites?.members[curWeek - 1] != null && TouchUtil.overlaps(weekSprites.members[curWeek - 1])) {
+					changeWeek(-1);
 				}
 			}
 

@@ -155,6 +155,7 @@ class Main extends Sprite
 
 		Conductor.init();
 		EventManager.init();
+		funkin.mobile.TouchUtil.init();
 		FlxG.signals.focusGained.add(onFocus);
 		FlxG.signals.preStateSwitch.add(onStateSwitch);
 		FlxG.signals.postStateSwitch.add(onStateSwitchPost);

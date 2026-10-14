@@ -8,6 +8,7 @@ import funkin.backend.scripting.events.menu.MenuChangeEvent;
 import funkin.backend.scripting.events.menu.freeplay.*;
 import funkin.backend.system.Conductor;
 import funkin.game.HealthIcon;
+import funkin.mobile.TouchUtil;
 import funkin.savedata.FunkinSave;
 
 using StringTools;
@@ -187,6 +188,8 @@ class FreeplayState extends MusicBeatState
 		changeCoopMode(0, true);
 
 		interpColor = new FlxInterpolateColor(bg.color);
+
+		addBackButton();
 	}
 
 	private var TEXT_FREEPLAY_SCORE = TU.getRaw("freeplay.score");
@@ -207,14 +210,19 @@ class FreeplayState extends MusicBeatState
 
 		var selectedAnotherSong:Bool = false;
 		if (canSelect) {
-			changeSelection((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - FlxG.mouse.wheel);
-			changeDiff((controls.LEFT_P ? -1 : 0) + (controls.RIGHT_P ? 1 : 0));
-			changeCoopMode((controls.CHANGE_MODE ? 1 : 0)); // TODO: make this configurable
+			changeSelection((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - FlxG.mouse.wheel + TouchUtil.verticalScroll);
+			changeDiff((controls.LEFT_P ? -1 : 0) + (controls.RIGHT_P ? 1 : 0) + (TouchUtil.swipeLeft ? -1 : 0) + (TouchUtil.swipeRight ? 1 : 0));
+			changeCoopMode((controls.CHANGE_MODE || TouchUtil.tappedOn(coopText) ? 1 : 0)); // TODO: make this configurable
 			// putting it before so that its actually smooth
 
-			if (FlxG.mouse.justPressed && grpSongs != null) {
+			if (TouchUtil.tappedOn(diffText)) {
+				changeDiff(TouchUtil.tappedLeftHalf(diffText) ? -1 : 1);
+				selectedAnotherSong = true;
+			}
+
+			if (TouchUtil.tapped && grpSongs != null && !selectedAnotherSong) {
 				for (index => sprite in grpSongs.members) {
-					if (curSelected != index && FlxG.mouse.overlaps(sprite)) {
+					if (curSelected != index && TouchUtil.overlaps(sprite)) {
 						changeSelection(index - curSelected);
 						selectedAnotherSong = true;
 						break;
@@ -236,7 +244,7 @@ class FreeplayState extends MusicBeatState
 		interpColor.fpsLerpTo(curSong.color, 0.0625);
 		bg.color = interpColor.color;
 
-		if (controls.BACK || FlxG.mouse.justPressedRight)
+		if (controls.BACK || FlxG.mouse.justPressedRight || mobileBackPressed)
 		{
 			CoolUtil.playMenuSFX(CANCEL, 0.7);
 			FlxG.switchState(new MainMenuState());
@@ -247,8 +255,8 @@ class FreeplayState extends MusicBeatState
 			convertChart();
 		#end
 
-		if ((controls.ACCEPT || (!selectedAnotherSong && FlxG.mouse.justPressed && grpSongs?.members[curSelected] != null
-			&& FlxG.mouse.overlaps(grpSongs.members[curSelected]))))
+		if ((controls.ACCEPT || (canSelect && !selectedAnotherSong && grpSongs?.members[curSelected] != null
+			&& TouchUtil.tappedOn(grpSongs.members[curSelected]))))
 		{
 			select();
 		}

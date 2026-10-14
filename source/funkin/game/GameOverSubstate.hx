@@ -90,6 +90,9 @@ class GameOverSubstate extends MusicBeatSubstate
 		cancelConductorUpdate = true;
 
 		DiscordUtil.call("onGameOver", []);
+
+		addBackButton();
+
 		gameoverScript.call("postCreate");
 	}
 
@@ -102,8 +105,8 @@ class GameOverSubstate extends MusicBeatSubstate
 		if (__cancelDefault)
 			return;
 
-		if (controls.ACCEPT) endBullshit();
-		if (controls.BACK) exit();
+		if (controls.BACK || mobileBackPressed) exit();
+		else if (controls.ACCEPT || funkin.mobile.TouchUtil.tapped) endBullshit();
 
 		if (!isEnding && ((!lossSFX.playing) || (character.getAnimName() == "firstDeath" && character.isAnimFinished())) && (FlxG.sound.music == null || !FlxG.sound.music.playing))
 		{

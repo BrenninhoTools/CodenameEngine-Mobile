@@ -26,6 +26,7 @@
 		<lib name="format"/>
 		<lib name="markdown"/>
 		<lib name="nape-haxe4"/>
+		<lib name="extension-androidtools" version="2.2.2"/>
 
 		<!-- For building lime -->
 		<lib global="true" name="hxp"/> <lib name="hxp"/>

@@ -13,6 +13,7 @@ import funkin.backend.system.Conductor;
 import funkin.backend.utils.FunkinParentDisabler;
 import funkin.backend.utils.FunkinParentDisabler.ParentDisableable;
 import funkin.editors.charter.Charter;
+import funkin.mobile.TouchUtil;
 import funkin.menus.StoryMenuState;
 import funkin.options.OptionsMenu;
 import funkin.options.keybinds.KeybindsOptions;
@@ -57,6 +58,10 @@ class PauseSubState extends MusicBeatSubstate
 
 		if (menuItems.contains("Exit to charter") && !PlayState.chartingMode)
 			menuItems.remove("Exit to charter");
+
+		#if mobile
+		menuItems.remove("Change Controls");
+		#end
 
 		add(parentDisabler = new FunkinParentDisabler(parentDisablerExcludeList));
 
@@ -125,6 +130,8 @@ class PauseSubState extends MusicBeatSubstate
 		camera = new FlxCamera();
 		camera.bgColor = 0;
 		FlxG.cameras.add(camera, false);
+
+		addBackButton();
 	}
 
 	override function createPost() {
@@ -146,10 +153,31 @@ class PauseSubState extends MusicBeatSubstate
 
 		var upP = controls.UP_P;
 		var downP = controls.DOWN_P;
-		var scroll = FlxG.mouse.wheel;
+		var scroll = FlxG.mouse.wheel - TouchUtil.verticalScroll;
 
 		if (upP || downP || scroll != 0)  // like this we wont break mods that expect a 0 change event when calling sometimes  - Nex
 			changeSelection((upP ? -1 : 0) + (downP ? 1 : 0) - scroll);
+
+		if (mobileBackPressed) {
+			var resumeIndex = menuItems.indexOf("Resume");
+			if (resumeIndex >= 0) {
+				curSelected = resumeIndex;
+				selectOption();
+			}
+			else
+				close();
+			return;
+		}
+
+		if (TouchUtil.tapped && grpMenuShit != null) {
+			for (index => item in grpMenuShit.members) {
+				if (item != null && TouchUtil.overlaps(item, camera)) {
+					if (index != curSelected) changeSelection(index - curSelected);
+					else selectOption();
+					return;
+				}
+			}
+		}
 
 		if (controls.ACCEPT)
 			selectOption();

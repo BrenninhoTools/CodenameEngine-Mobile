@@ -8,6 +8,7 @@ import funkin.backend.scripting.events.menu.MenuChangeEvent;
 import funkin.backend.scripting.events.NameEvent;
 import funkin.menus.credits.CreditsMain;
 import funkin.options.OptionsMenu;
+import funkin.mobile.TouchUtil;
 import lime.app.Application;
 
 using StringTools;
@@ -93,6 +94,8 @@ class MainMenuState extends MusicBeatState
 		add(devModeWarning);
 		devModeWarning.scrollFactor.set();
 		devModeWarning.alpha = 0;
+
+		addBackButton();
 	}
 
 	var selectedSomethin:Bool = false;
@@ -134,16 +137,16 @@ class MainMenuState extends MusicBeatState
 
 			var upP = controls.UP_P;
 			var downP = controls.DOWN_P;
-			var scroll = FlxG.mouse.wheel;
+			var scroll = FlxG.mouse.wheel - TouchUtil.verticalScroll;
 
 			if (upP || downP || scroll != 0)  // like this we wont break mods that expect a 0 change event when calling sometimes  - Nex
 				changeItem((upP ? -1 : 0) + (downP ? 1 : 0) - scroll);
 
-			if (controls.BACK)
+			if (controls.BACK || mobileBackPressed)
 				FlxG.switchState(new TitleState());
 
 			#if MOD_SUPPORT
-			if (controls.SWITCHMOD || (FlxG.mouse.justPressed && versionText != null && FlxG.mouse.overlaps(versionText))) {
+			if (controls.SWITCHMOD || TouchUtil.tappedOn(versionText)) {
 				openSubState(new ModSwitchMenu());
 				persistentUpdate = false;
 				persistentDraw = true;
@@ -153,9 +156,9 @@ class MainMenuState extends MusicBeatState
 			if (controls.ACCEPT)
 				selectItem();
 
-			if (FlxG.mouse.justPressed && menuItems != null) {
+			if (TouchUtil.tapped && menuItems != null && !selectedSomethin) {
 				for (index => sprite in menuItems.members) {
-					if (FlxG.mouse.overlaps(sprite)) {
+					if (TouchUtil.overlaps(sprite)) {
 						if (curSelected != index) changeItem(index - curSelected);
 						else selectItem();
 						break;

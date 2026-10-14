@@ -310,6 +310,7 @@ class PlayState extends MusicBeatState
 	 */
 	public var iconArray:Array<HealthIcon> = [];
 
+	public var hitbox:funkin.mobile.Hitbox;
 	/**
 	 * Camera for the HUD (notes, misses).
 	 */
@@ -970,6 +971,26 @@ class PlayState extends MusicBeatState
 			SaveWarning.warningFunc = saveWarn;
 			SaveWarning.saveFunc = () -> Charter.saveEverything(false);
 		}
+
+		#if mobile
+		createMobileControls();
+		#end
+	}
+
+	public function createMobileControls() {
+		if (hitbox == null) {
+			hitbox = new funkin.mobile.Hitbox(getMobileKeyCount());
+			hitbox.cameras = [createMobileCamera()];
+			add(hitbox);
+		}
+		addPauseButton();
+	}
+
+	function getMobileKeyCount():Int {
+		for (strLine in strumLines.members)
+			if (strLine != null && !strLine.cpu && strLine.members.length > 0)
+				return strLine.members.length;
+		return 4;
 	}
 
 	@:dox(hide) public override function createPost() {
@@ -1546,7 +1567,10 @@ class PlayState extends MusicBeatState
 		while(events.length > 0 && events.last().time <= Conductor.songPosition)
 			executeEvent(events.pop());
 
-		if (controls.PAUSE && startedCountdown && canPause)
+		if (hitbox != null && hitbox.exists)
+			hitbox.ensureKeyCount(getMobileKeyCount());
+
+		if ((controls.PAUSE || (mobilePauseButton != null && mobilePauseButton.justPressed)) && startedCountdown && canPause)
 			pauseGame();
 
 		if (generatedMusic)

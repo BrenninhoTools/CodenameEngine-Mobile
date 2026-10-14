@@ -321,8 +321,52 @@ class MusicBeatState extends FlxState implements IBeatCancellableReceiver
 		event("onResize", EventManager.get(ResizeEvent).recycle(w, h, null, null));
 	}
 
+	public var mobileCamera:FlxCamera;
+	public var mobileBackButton:funkin.mobile.MobileButton;
+	public var mobilePauseButton:funkin.mobile.MobileButton;
+
+	public var mobileBackPressed(get, never):Bool;
+
+	function get_mobileBackPressed():Bool
+		return mobileBackButton != null && mobileBackButton.exists && mobileBackButton.justPressed;
+
+	public function createMobileCamera():FlxCamera
+	{
+		if (mobileCamera == null)
+		{
+			mobileCamera = new FlxCamera();
+			mobileCamera.bgColor = 0;
+			FlxG.cameras.add(mobileCamera, false);
+		}
+		return mobileCamera;
+	}
+
+	public function addBackButton():funkin.mobile.MobileButton
+	{
+		if (mobileBackButton == null)
+			add(mobileBackButton = funkin.mobile.MobileButton.createBack(createMobileCamera()));
+		return mobileBackButton;
+	}
+
+	public function addPauseButton():funkin.mobile.MobileButton
+	{
+		if (mobilePauseButton == null)
+			add(mobilePauseButton = funkin.mobile.MobileButton.createPause(createMobileCamera()));
+		return mobilePauseButton;
+	}
+
+	function removeMobileCamera()
+	{
+		if (mobileCamera != null && FlxG.cameras != null && FlxG.cameras.list.contains(mobileCamera))
+			FlxG.cameras.remove(mobileCamera, true);
+		mobileCamera = null;
+	}
+
 	public override function destroy() {
 		super.destroy();
+		mobileBackButton = null;
+		mobilePauseButton = null;
+		removeMobileCamera();
 		graphicCache.destroy();
 		call("destroy");
 		stateScripts = FlxDestroyUtil.destroy(stateScripts);

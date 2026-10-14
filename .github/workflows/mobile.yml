@@ -1,0 +1,145 @@
+name: Mobile Builds
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  HAXE_VERSION: 4.3.7
+  NDK_VERSION: r27c
+  HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
+
+jobs:
+  android:
+    name: Android Build (ARM64)
+    permissions: write-all
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Pulling the new commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setting up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - name: Setting up Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          local-cache: false
+
+      - name: Setting up Haxe
+        uses: krdlab/setup-haxe@v2
+        with:
+          haxe-version: ${{ env.HAXE_VERSION }}
+
+      - name: Installing/Updating libraries
+        run: |
+          haxelib --global update haxelib
+          haxe -cp commandline -D analyzer-optimize --run Main setup -si
+
+      - name: Configuring Lime for Android
+        run: |
+          haxelib run lime setup -alias -y -nocffi
+          haxelib run lime config ANDROID_SDK $ANDROID_HOME
+          haxelib run lime config ANDROID_NDK_ROOT ${{ steps.setup-ndk.outputs.ndk-path }}
+          haxelib run lime config JAVA_HOME $JAVA_HOME
+          haxelib run lime config ANDROID_SETUP true
+
+      - name: Building the game
+        run: |
+          haxelib run lime rebuild hxcpp
+          haxelib run lime rebuild tools
+          haxelib run lime rebuild android -release -nocolor -arm64
+          haxelib run lime build android -release -arm64 -DCOMPILE_EXPERIMENTAL
+
+      - name: Signing the APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          UNSIGNED=$(find export/release/android/bin -name "*.apk" | head -n 1)
+          if [ -z "$UNSIGNED" ]; then
+            echo "No APK was generated."
+            exit 1
+          fi
+
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
+          else
+            KEYSTORE_PASSWORD=codename
+            KEY_ALIAS=codename
+            KEY_PASSWORD=codename
+            keytool -genkeypair -v -keystore keystore.jks -alias $KEY_ALIAS -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass $KEYSTORE_PASSWORD -keypass $KEY_PASSWORD -dname "CN=Codename Engine Mobile, O=BrenninhoTools, C=BR"
+          fi
+
+          mkdir -p build
+          $BUILD_TOOLS/zipalign -f -p 4 "$UNSIGNED" build/aligned.apk
+          $BUILD_TOOLS/apksigner sign --ks keystore.jks --ks-pass pass:$KEYSTORE_PASSWORD --ks-key-alias $KEY_ALIAS \
+            --key-pass pass:$KEY_PASSWORD --out build/CodenameEngine-arm64.apk build/aligned.apk
+          $BUILD_TOOLS/apksigner verify build/CodenameEngine-arm64.apk
+          rm -f keystore.jks build/aligned.apk
+
+      - name: Uploading artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Codename Engine Android (ARM64)
+          path: build/CodenameEngine-arm64.apk
+          if-no-files-found: error
+
+  ios:
+    name: iOS Build
+    permissions: write-all
+    runs-on: macos-26
+    steps:
+      - name: Pulling the new commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setting up Haxe
+        uses: krdlab/setup-haxe@v2
+        with:
+          haxe-version: ${{ env.HAXE_VERSION }}
+
+      - name: Installing/Updating libraries
+        run: |
+          haxelib --global update haxelib
+          haxe -cp commandline -D analyzer-optimize --run Main setup -si
+
+      - name: Building the game
+        run: |
+          haxelib run lime setup -alias -y -nocffi
+          haxelib run lime rebuild hxcpp
+          haxelib run lime rebuild tools
+          haxelib run lime rebuild ios -release -nocolor
+          haxelib run lime build ios -release -nosign -DCOMPILE_EXPERIMENTAL
+
+      - name: Packaging the IPA
+        run: |
+          APP=$(find export/release/ios/build -name "*.app" -type d | grep -i "iphoneos" | head -n 1)
+          if [ -z "$APP" ]; then
+            echo "No .app bundle was generated."
+            exit 1
+          fi
+          mkdir -p build/Payload
+          cp -R "$APP" build/Payload/
+          cd build
+          zip -qr CodenameEngine.ipa Payload
+
+      - name: Uploading artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Codename Engine iOS
+          path: build/CodenameEngine.ipa
+          if-no-files-found: error

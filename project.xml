@@ -128,6 +128,10 @@
 	<window if="mobile" resizable="false"/>
 	<window if="html5 || switch" resizable="true"/>
 
+	<section if="android">
+		<architecture exclude="armv7"/>
+	</section>
+
 	<!-- _______________________________ Libraries ______________________________ -->
 
 	<!-- KEEP BOTH OF THESE AS THERE ARE SOME PARTICULAR CASES! -->
@@ -152,6 +156,7 @@
 	<haxelib name="nape-haxe4" if="NAPE_ENABLED"/>
 
 	<haxelib name="hxcpp-debug-server" if="debug"/>
+	<haxelib name="extension-androidtools" if="android"/>
 
 	<!-- ____________________________ Source Settings ___________________________ -->
 
@@ -189,7 +194,7 @@
 		<assets path="assets/"    rename="assets"	exclude="*.mp3" unless="web"/>
 
 		<!-- TODO: make it copy this manually, instead of using assets node, so it doesn't manually check for fonts -->
-		<assets path='mods' rename='mods' embed='false' />
+		<assets path='mods' rename='mods' embed='false' unless="mobile"/>
 	</section>
 
 	<!-- <assets path='art/readme.txt' rename='do NOT readme.txt' /> -->

@@ -133,7 +133,7 @@ class DialogueCutscene extends ScriptedCutscene {
 
 	public override function update(elapsed:Float) {
 		super.update(elapsed);
-		if(controls.ACCEPT) {
+		if(controls.ACCEPT || funkin.mobile.TouchUtil.tapped) {
 			if(dialogueBox.dialogueEnded) next();
 			else dialogueBox.text.skip();
 		}

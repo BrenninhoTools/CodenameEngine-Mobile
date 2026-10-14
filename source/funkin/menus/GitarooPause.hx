@@ -50,10 +50,26 @@ class GitarooPause extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
-		if (controls.LEFT_P || controls.RIGHT_P)
+		if (controls.LEFT_P || controls.RIGHT_P || funkin.mobile.TouchUtil.swipeLeft || funkin.mobile.TouchUtil.swipeRight)
 			changeThing();
 
-		if (controls.ACCEPT)
+		var touchAccept = false;
+		if (funkin.mobile.TouchUtil.tapped)
+		{
+			for (button in [replayButton, cancelButton])
+			{
+				if (funkin.mobile.TouchUtil.overlaps(button))
+				{
+					if ((button == replayButton) != replaySelect)
+						changeThing();
+					else
+						touchAccept = true;
+					break;
+				}
+			}
+		}
+
+		if (controls.ACCEPT || touchAccept)
 		{
 			if (PlayState.instance != null && PlayState.chartingMode && Charter.undos.unsaved)
 				PlayState.instance.saveWarn(false);
