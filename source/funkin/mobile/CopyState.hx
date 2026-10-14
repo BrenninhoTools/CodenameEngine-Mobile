@@ -57,8 +57,8 @@ class CopyState extends FlxState
 	public static function getStartState():Class<FlxState>
 	{
 		#if android
-		if (!StorageUtil.hasStorageTypeSetting())
-			return StorageSetupState;
+		if (!StorageUtil.autoDetectStorageType())
+			return StoragePermissionState;
 		#end
 		return needsCopy() ? CopyState : MainState;
 	}

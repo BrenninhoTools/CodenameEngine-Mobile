@@ -168,6 +168,62 @@ class StorageUtil
 	public static function hasStorageTypeSetting():Bool
 		return readSetting(STORAGE_TYPE_FILE) != null;
 
+	public static function getExternalFolder():String
+	{
+		#if android
+		var external = AndroidStorage.getExternalStorageDirectory();
+		if (external != null && external.length > 0)
+			return Path.addTrailingSlash(Path.addTrailingSlash(external) + EXTERNAL_FOLDER);
+		#end
+		return null;
+	}
+
+	public static function externalFolderExists():Bool
+	{
+		#if sys
+		var folder = getExternalFolder();
+		try
+		{
+			return folder != null && FileSystem.exists(folder);
+		}
+		catch (e:Dynamic) {}
+		#end
+		return false;
+	}
+
+	public static function autoDetectStorageType():Bool
+	{
+		#if android
+		if (hasStorageTypeSetting())
+			return true;
+
+		if (hasStoragePermission() && hasExtractedAssets(getExternalFolder()))
+			return applyDetectedType(STORAGE_EXTERNAL);
+
+		for (type in [STORAGE_DATA, STORAGE_MEDIA, STORAGE_OBB])
+		{
+			var path = getDirectoryForType(type);
+			if (path != null && hasExtractedAssets(path))
+				return applyDetectedType(type);
+		}
+
+		if (externalFolderExists() && !hasStoragePermission())
+			return false;
+
+		return applyDetectedType(externalFolderExists() ? STORAGE_EXTERNAL : STORAGE_DATA);
+		#else
+		return true;
+		#end
+	}
+
+	public static function applyDetectedType(type:String):Bool
+	{
+		writeSetting(STORAGE_TYPE_FILE, type);
+		reload();
+		Logs.trace('[StorageUtil] Using storage type ${activeStorageType}: ${storageDirectory}', INFO);
+		return true;
+	}
+
 	public static function hasExtractedAssets(?path:String):Bool
 	{
 		#if sys

@@ -9,6 +9,7 @@ class MobileOptions extends TreeMenuScreen {
 		add(new Checkbox(getNameID('invisibleHitbox'), getDescID('invisibleHitbox'), 'invisibleHitbox'));
 		add(new ArrayOption(getNameID('hitboxMode'), getDescID('hitboxMode'), funkin.mobile.Hitbox.MODES, funkin.mobile.Hitbox.MODES, 'hitboxMode'));
 		add(new Checkbox(getNameID('invisiblePauseButton'), getDescID('invisiblePauseButton'), 'invisiblePauseButton'));
+		add(new Checkbox(getNameID('antiCrash'), getDescID('antiCrash'), 'antiCrash'));
 
 		#if android
 		Options.storageType = StorageUtil.getStorageType();
