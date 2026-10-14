@@ -12,7 +12,7 @@ concurrency:
 env:
   HAXE_VERSION: 4.3.7
   NDK_VERSION: r27c
-  LIBS_CACHE_VERSION: v3
+  LIBS_CACHE_VERSION: v4
   HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
 
 jobs:
@@ -76,6 +76,7 @@ jobs:
         run: |
           haxelib --global update haxelib
           haxe -cp commandline -D analyzer-optimize --run Main setup -si
+          bash building/patch-lime-mobile.sh
 
       - name: Configuring Lime for Android
         run: |
@@ -194,6 +195,7 @@ jobs:
         run: |
           haxelib --global update haxelib
           haxe -cp commandline -D analyzer-optimize --run Main setup -si
+          bash building/patch-lime-mobile.sh
 
       - name: Rebuilding Lime and Hxcpp
         if: steps.libs-cache.outputs.cache-hit != 'true'
