@@ -71,10 +71,12 @@ jobs:
           key: gradle-android-${{ hashFiles('project.xml') }}
           restore-keys: gradle-android-
 
+      - name: Updating haxelib
+        run: haxelib --global update haxelib
+
       - name: Installing libraries
         if: steps.libs-cache.outputs.cache-hit != 'true'
         run: |
-          haxelib --global update haxelib
           haxe -cp commandline -D analyzer-optimize --run Main setup -si
           bash building/patch-lime-mobile.sh
 
@@ -190,10 +192,12 @@ jobs:
           key: hxcpp-ios-${{ github.run_id }}
           restore-keys: hxcpp-ios-
 
+      - name: Updating haxelib
+        run: haxelib --global update haxelib
+
       - name: Installing libraries
         if: steps.libs-cache.outputs.cache-hit != 'true'
         run: |
-          haxelib --global update haxelib
           haxe -cp commandline -D analyzer-optimize --run Main setup -si
           bash building/patch-lime-mobile.sh
 
