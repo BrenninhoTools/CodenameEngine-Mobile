@@ -90,8 +90,21 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 		var path = getAssetPath();
 		editedTimes[id] = FileSystem.stat(path).mtime.getTime();
 
+		#if mobile
+		if (!funkin.backend.utils.TextureGuard.canLoad(path, id))
+			return null;
+		var e:Image = null;
+		try {
+			e = Image.fromFile(path);
+		} catch (err:Dynamic) {
+			Logs.warn('Failed to load image "$id": $err');
+			e = null;
+		}
+		return e;
+		#else
 		var e = Image.fromFile(path);
 		return e;
+		#end
 	}
 
 	public override function getPath(id:String):String {
