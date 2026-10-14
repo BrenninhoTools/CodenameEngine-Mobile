@@ -137,7 +137,7 @@ class ModSwitchMenu extends MusicBeatSubstate {
 		desc = new FunkinText(4, title.y + title.height, FlxG.width - 8, getDescription(modConf[curSelected]), 16);
 		add(desc);
 
-		keyInfo = new FunkinText(FlxG.width - 4, title.y + title.height * 0.5, 0, '[${CoolUtil.keyToString(Options.SOLO_CHANGE_MODE[0])}] >>>', 24);
+		keyInfo = new FunkinText(FlxG.width - 4, title.y + title.height * 0.5, 0, #if mobile 'Addons >>>' #else '[${CoolUtil.keyToString(Options.SOLO_CHANGE_MODE[0])}] >>>' #end, 24);
 		keyInfo.x -= keyInfo.width;
 		keyInfo.y -= keyInfo.height * 0.5;
 		keyInfo.visible = addons.length > 0;
@@ -294,8 +294,12 @@ class ModSwitchMenu extends MusicBeatSubstate {
 			desc.text = getDescription(modConf[curSelected]);
 		}
 
+		#if mobile
+		keyInfo.text = inAddons ? "<<< Mods" : "Addons >>>";
+		#else
 		keyInfo.text = '[${CoolUtil.keyToString(Options.SOLO_CHANGE_MODE[0])}]';
 		keyInfo.text = inAddons ? "<<< " + keyInfo.text : keyInfo.text + " >>>";
+		#end
 		CoolUtil.playMenuSFX(playCancel ? CANCEL : SCROLL, 0.7);
 	}
 

@@ -8,6 +8,7 @@ import funkin.backend.scripting.events.menu.MenuChangeEvent;
 import funkin.backend.scripting.events.NameEvent;
 import funkin.menus.credits.CreditsMain;
 import funkin.options.OptionsMenu;
+import funkin.mobile.MobileButton;
 import funkin.mobile.TouchUtil;
 import lime.app.Application;
 
@@ -27,6 +28,10 @@ class MainMenuState extends MusicBeatState
 	var versionText:FunkinText;
 
 	var devModeWarning:FunkinText;
+
+	#if (mobile && MOD_SUPPORT)
+	var modsButton:MobileButton;
+	#end
 
 	public var canAccessDebugMenus:Bool = !Flags.DISABLE_EDITORS;
 
@@ -80,7 +85,9 @@ class MainMenuState extends MusicBeatState
 		versionText = new FunkinText(5, FlxG.height - 2, 0, [
 			Flags.VERSION_MESSAGE,
 			TU.translate("mainMenu.commit", [Flags.COMMIT_NUMBER, Flags.COMMIT_HASH]),
+			#if !mobile
 			TU.translate("mainMenu.openMods", [controls.getKeyName(SWITCHMOD)]),
+			#end
 			''
 		].join('\n'));
 		versionText.y -= versionText.height;
@@ -96,6 +103,11 @@ class MainMenuState extends MusicBeatState
 		devModeWarning.alpha = 0;
 
 		addBackButton();
+
+		#if (mobile && MOD_SUPPORT)
+		add(modsButton = MobileButton.createMods(createMobileCamera()));
+		versionText.x = modsButton.x + modsButton.width + 10;
+		#end
 	}
 
 	var selectedSomethin:Bool = false;
@@ -146,7 +158,7 @@ class MainMenuState extends MusicBeatState
 				FlxG.switchState(new TitleState());
 
 			#if MOD_SUPPORT
-			if (controls.SWITCHMOD || TouchUtil.tappedOn(versionText)) {
+			if (controls.SWITCHMOD || TouchUtil.tappedOn(versionText) #if (mobile) || (modsButton != null && modsButton.justPressed) #end) {
 				openSubState(new ModSwitchMenu());
 				persistentUpdate = false;
 				persistentDraw = true;

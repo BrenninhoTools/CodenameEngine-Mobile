@@ -57,6 +57,16 @@ class MobileButton extends FlxSprite
 		return button;
 	}
 
+	public static function createMods(?camera:FlxCamera):MobileButton
+	{
+		var button = new MobileButton(0, 0, 'mobile/modsButton', 'mods', 0.65);
+		button.x = 10;
+		button.y = FlxG.height - button.height - 10;
+		if (camera != null)
+			button.cameras = [camera];
+		return button;
+	}
+
 	public static function createPause(?camera:FlxCamera):MobileButton
 	{
 		var button = new MobileButton(0, 0, 'mobile/pauseButton', 'pause', 0.8);
