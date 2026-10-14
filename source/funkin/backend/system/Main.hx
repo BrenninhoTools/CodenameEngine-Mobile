@@ -179,6 +179,9 @@ class Main extends Sprite
 
 	#if mobile
 	function initMobile() {
+		FlxG.signals.preStateCreate.add((state) -> {
+			if (state != null) Logs.trace('Creating state: ' + Type.getClassName(Type.getClass(state)), VERBOSE);
+		});
 		updateMobileFramerateScale();
 		Lib.current.stage.addEventListener(openfl.events.Event.RESIZE, (_) -> updateMobileFramerateScale());
 		Lib.current.stage.addEventListener(openfl.events.MouseEvent.MOUSE_DOWN, (_) -> recoverFocus());
