@@ -389,11 +389,20 @@ class Paths
 	 * @param SkipMultiCheck Whenever the multi spritesheet check should be skipped.
 	 * @return FlxFramesCollection Frames
 	 */
+	public static var traceLoading:Bool = false;
+
+	public static inline function loadTrace(text:String) {
+		#if mobile
+		if (traceLoading) Logs.trace('[Load] $text', VERBOSE);
+		#end
+	}
+
 	static function loadFrames(path:String, Unique:Bool = false, Key:String = null, SkipAtlasCheck:Bool = false, SkipMultiCheck:Bool = false,
 			Ext:String = null, ?animateSettings:FlxAnimateSettings):FlxFramesCollection
 	{
 		var noExt = Path.withoutExtension(path);
 		var ext = Ext != null ? Ext : Path.extension(path);
+		loadTrace('frames "$path"');
 
 		if (!SkipMultiCheck && Assets.exists('$noExt/1.$ext')) {
 			var cur:Int = 1;
@@ -402,19 +411,25 @@ class Paths
 				finalFrames.push('$noExt/$cur.$ext');
 				cur++;
 			}
+			loadTrace('multi sheet with ${finalFrames.length} parts');
 			return getMultiFrames(finalFrames, true, Unique,
 				'$noExt/mult', true, ext, animateSettings);
 		} else if (!SkipAtlasCheck && Assets.exists('$noExt/Animation.json')) {
 			// ???
 			if (noExt.endsWith('/')) noExt = noExt.substr(0, noExt.length - 1);
+			loadTrace('animate atlas "$noExt"');
 			return Paths.getAnimateAtlasAlt(noExt, animateSettings, Unique);
 		}
 
+		loadTrace('bitmap "$noExt.$ext" exists: ${Assets.exists('$noExt.$ext')}');
 		var graph:FlxGraphic = FlxG.bitmap.add('$noExt.$ext', Unique, Key);
+		loadTrace(graph == null ? 'bitmap missing' : 'bitmap ready ${graph.width}x${graph.height}');
 		if (graph == null) return null;
 
-		if (Assets.exists('$noExt.xml'))
+		if (Assets.exists('$noExt.xml')) {
+			loadTrace('sparrow "$noExt.xml"');
 			return FlxAtlasFrames.fromSparrow(graph, '$noExt.xml');
+		}
 		else if (Assets.exists('$noExt.txt'))
 			return FlxAtlasFrames.fromSpriteSheetPacker(graph, '$noExt.txt');
 		else if (Assets.exists('$noExt.json'))

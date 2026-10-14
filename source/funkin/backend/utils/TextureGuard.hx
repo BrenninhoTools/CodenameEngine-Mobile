@@ -31,6 +31,7 @@ class TextureGuard
 			return true;
 		var max = getMaxTextureSize();
 		var name = id != null ? id : path;
+		funkin.backend.assets.Paths.loadTrace('image size ${size.width}x${size.height} (max $max)');
 		if (size.width > max || size.height > max)
 		{
 			Logs.warn('Skipped image "$name": ${size.width}x${size.height} is bigger than this GPU supports (${max}x${max})');

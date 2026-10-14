@@ -242,12 +242,14 @@ class MainMenuState extends MusicBeatState
 	function createMenuItem(option:String, y:Float):FlxSprite
 	{
 		var frames:FlxFramesCollection = null;
-		#if mobile Logs.trace('[MainMenu] Loading item "$option"', VERBOSE); #end
+		#if mobile Logs.trace('[MainMenu] Loading item "$option"', VERBOSE); Paths.traceLoading = true; #end
 		try {
 			frames = Paths.getFrames('menus/mainmenu/${option}');
 		} catch (e:Dynamic) {
+			#if mobile Logs.trace('[MainMenu] Item "$option" failed: $e', WARNING); #end
 			frames = null;
 		}
+		#if mobile Paths.traceLoading = false; #end
 		#if mobile Logs.trace('[MainMenu] Item "$option" mod frames: ' + (frames == null ? "none" : '${frames.frames.length}'), VERBOSE); #end
 		if (!hasPrefix(frames, option + " basic"))
 		{

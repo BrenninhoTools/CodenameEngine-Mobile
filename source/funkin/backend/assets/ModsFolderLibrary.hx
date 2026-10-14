@@ -91,6 +91,7 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 		editedTimes[id] = FileSystem.stat(path).mtime.getTime();
 
 		#if mobile
+		Paths.loadTrace('image file "$path"');
 		if (!funkin.backend.utils.TextureGuard.canLoad(path, id))
 			return null;
 		var e:Image = null;
