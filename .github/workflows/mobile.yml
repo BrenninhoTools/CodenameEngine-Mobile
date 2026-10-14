@@ -118,6 +118,12 @@ jobs:
           path: .haxelib
           key: ${{ steps.libs-cache.outputs.cache-primary-key }}
 
+      - name: Removing stale precompiled headers
+        run: |
+          if [ -d .hxcpp_cache ]; then
+            find .hxcpp_cache -type d -name "pch*" -prune -exec rm -rf {} +
+          fi
+
       - name: Building the game
         run: haxelib run lime build android -release -arm64 -DCOMPILE_EXPERIMENTAL
 
@@ -215,6 +221,12 @@ jobs:
         with:
           path: .haxelib
           key: ${{ steps.libs-cache.outputs.cache-primary-key }}
+
+      - name: Removing stale precompiled headers
+        run: |
+          if [ -d .hxcpp_cache ]; then
+            find .hxcpp_cache -type d -name "pch*" -prune -exec rm -rf {} +
+          fi
 
       - name: Building the game
         run: haxelib run lime build ios -release -nosign -DCOMPILE_EXPERIMENTAL
