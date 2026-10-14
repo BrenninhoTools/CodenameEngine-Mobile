@@ -92,7 +92,7 @@ class Main extends Sprite
 		FakeCamera.instance = new FakeCamera();
 		FakeCallCamera.instance = new FakeCallCamera();
 
-		addChild(game = new FunkinGame(gameWidth, gameHeight, MainState, Options.framerate, Options.framerate, skipSplash, startFullscreen));
+		addChild(game = new FunkinGame(gameWidth, gameHeight, #if mobile funkin.mobile.CopyState.needsCopy() ? funkin.mobile.CopyState : #end MainState, Options.framerate, Options.framerate, skipSplash, startFullscreen));
 
 		#if !web
 		addChild(framerateSprite = new Framerate());
@@ -191,7 +191,7 @@ class Main extends Sprite
 
 	static function updateMobileFramerateScale() {
 		if (framerateSprite == null || Lib.current.stage == null) return;
-		var scale = Math.max(1, Math.min(Lib.current.stage.stageWidth / 1280, Lib.current.stage.stageHeight / 720) * 1.5);
+		var scale = Math.max(1, Math.min(Lib.current.stage.stageWidth / 1280, Lib.current.stage.stageHeight / 720) * 1.15);
 		framerateSprite.scaleX = framerateSprite.scaleY = scale;
 	}
 
