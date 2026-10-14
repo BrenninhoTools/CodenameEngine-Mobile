@@ -261,7 +261,14 @@ final class TranslationUtil
 		#if mobile
 		if (languageFiles.length == 0) {
 			var folderPrefix = "assets/" + mainPath + "/";
-			var embeddedFiles = [for (id in lime.utils.Assets.list()) if (id.startsWith(folderPrefix) && id.indexOf("/", folderPrefix.length) == -1) id.substr(7)];
+			var embeddedFiles:Array<String> = [];
+			try {
+				var baseLibrary = Paths.assetsTree != null ? Paths.assetsTree.base : null;
+				if (baseLibrary != null)
+					embeddedFiles = [for (id in baseLibrary.list(null)) if (id.startsWith(folderPrefix) && id.indexOf("/", folderPrefix.length) == -1) id.substr(7)];
+			} catch(e) {
+				embeddedFiles = [];
+			}
 			for (file in embeddedFiles.sortAlphabetically()) languageFiles.push(file);
 		}
 		#end
