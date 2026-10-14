@@ -21,6 +21,9 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 	public var prefix = 'assets/';
 
 	public function new(basePath:String, libName:String, ?modName:String) {
+		#if (MOD_SUPPORT && CASE_INSENSITIVE_MODS)
+		clearCaseCache();
+		#end
 		this.basePath = basePath;
 		this.libName = libName;
 		this.prefix = 'assets/$libName/';
@@ -110,8 +113,54 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 	}
 
 	private function getAssetPath() {
+		#if CASE_INSENSITIVE_MODS
+		return resolveCaseInsensitive(basePath, _parsedAsset);
+		#else
 		return '$basePath/$_parsedAsset';
+		#end
 	}
+
+	#if CASE_INSENSITIVE_MODS
+	static var __caseCache:Map<String, Map<String, String>> = [];
+
+	public static function clearCaseCache()
+		__caseCache = [];
+
+	static function getDirectoryEntries(directory:String):Map<String, String> {
+		if (__caseCache.exists(directory)) return __caseCache.get(directory);
+		var entries:Map<String, String> = null;
+		try {
+			if (FileSystem.exists(directory) && FileSystem.isDirectory(directory)) {
+				entries = [];
+				for (entry in FileSystem.readDirectory(directory)) {
+					var lower = entry.toLowerCase();
+					if (!entries.exists(lower)) entries.set(lower, entry);
+				}
+			}
+		} catch(e) {
+			entries = null;
+		}
+		__caseCache.set(directory, entries);
+		return entries;
+	}
+
+	public static function resolveCaseInsensitive(base:String, relative:String):String {
+		var fullPath = '$base/$relative';
+		if (FileSystem.exists(fullPath)) return fullPath;
+
+		var trailingSlash = relative.endsWith("/");
+		var current = base;
+		for (part in relative.split("/")) {
+			if (part == "") continue;
+			var entries = getDirectoryEntries(current);
+			if (entries == null) return fullPath;
+			var actual = entries.get(part.toLowerCase());
+			if (actual == null) return fullPath;
+			current = '$current/$actual';
+		}
+		return trailingSlash ? current + "/" : current;
+	}
+	#end
 
 	private function __isCacheValid(cache:Map<String, Dynamic>, asset:String, isLocalCache:Bool = false) {
 		if (!editedTimes.exists(asset))
