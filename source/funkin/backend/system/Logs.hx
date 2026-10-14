@@ -128,13 +128,11 @@ final class Logs {
 		Sys.println("\r");
 		__showing = false;
 		#elseif mobile
-		while(__showing) {
-			Sys.sleep(0.05);
-		}
-		__showing = true;
-		@:privateAccess
-		Sys.print([for(t in text) t.text].join(""));
-		__showing = false;
+		var line = [for(t in text) t.text].join("");
+		try {
+			Sys.println(line);
+		} catch (_:Dynamic) {}
+		funkin.mobile.MobileLog.write(line);
 		#else
 		@:privateAccess
 		nativeTrace([for(t in text) t.text].join(""));

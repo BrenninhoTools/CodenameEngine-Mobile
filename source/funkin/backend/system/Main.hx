@@ -46,7 +46,7 @@ class Main extends Sprite
 	public static var goToCharter:Bool = false;
 
 	public static var scaleMode:FunkinRatioScaleMode;
-	#if !mobile
+	#if !web
 	public static var framerateSprite:Framerate;
 	#end
 
@@ -94,9 +94,13 @@ class Main extends Sprite
 
 		addChild(game = new FunkinGame(gameWidth, gameHeight, MainState, Options.framerate, Options.framerate, skipSplash, startFullscreen));
 
-		#if (!mobile && !web)
+		#if !web
 		addChild(framerateSprite = new Framerate());
 		SystemInfo.init();
+		#end
+
+		#if mobile
+		initMobile();
 		#end
 	}
 
@@ -172,6 +176,30 @@ class Main extends Sprite
 
 		initTransition();
 	}
+
+	#if mobile
+	function initMobile() {
+		updateMobileFramerateScale();
+		Lib.current.stage.addEventListener(openfl.events.Event.RESIZE, (_) -> updateMobileFramerateScale());
+		Lib.current.stage.addEventListener(openfl.events.MouseEvent.MOUSE_DOWN, (_) -> recoverFocus());
+		Lib.current.stage.addEventListener(openfl.events.Event.ACTIVATE, (_) -> recoverFocus());
+		framerateSprite.addEventListener(openfl.events.MouseEvent.CLICK, (_) -> {
+			if (Options.fpsCounter)
+				Framerate.debugMode = Framerate.debugMode == 1 ? 2 : 1;
+		});
+	}
+
+	static function updateMobileFramerateScale() {
+		if (framerateSprite == null || Lib.current.stage == null) return;
+		var scale = Math.max(1, Math.min(Lib.current.stage.stageWidth / 1280, Lib.current.stage.stageHeight / 720) * 1.5);
+		framerateSprite.scaleX = framerateSprite.scaleY = scale;
+	}
+
+	static function recoverFocus() @:privateAccess {
+		if (FlxG.game != null && FlxG.game._lostFocus)
+			FlxG.game.onFocus(null);
+	}
+	#end
 
 	public static function applySoundCurve(volume:Float) {
 		return Flags.USE_SOUND_VOLUME_CURVE ? Math.pow(volume, 1.75) : volume;
