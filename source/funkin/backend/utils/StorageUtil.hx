@@ -385,6 +385,12 @@ class StorageUtil
 		}
 		catch (e:Dynamic) {}
 		#end
+		if (isFontAsset(id))
+		{
+			var fontBytes = getEmbeddedFontBytes(id);
+			if (fontBytes != null)
+				return saveBytes(target, fontBytes);
+		}
 		try
 		{
 			return saveBytes(target, lime.utils.Assets.getBytes(id));
@@ -392,8 +398,57 @@ class StorageUtil
 		catch (e:Dynamic)
 		{
 			lastError = Std.string(e);
-			return false;
 		}
+		return isFontAsset(id);
+	}
+
+	public static function isFontAsset(id:String):Bool
+	{
+		try
+		{
+			if (lime.utils.Assets.isLocal(id, FONT) || lime.utils.Assets.exists(id, FONT))
+				return true;
+		}
+		catch (e:Dynamic) {}
+		var ext = Path.extension(id).toLowerCase();
+		return ext == "ttf" || ext == "otf";
+	}
+
+	public static function getEmbeddedFontBytes(id:String):Bytes
+	{
+		var key = flatName(id);
+		try
+		{
+			for (name in haxe.Resource.listNames())
+			{
+				if (!name.startsWith("LIME_font_"))
+					continue;
+				if (flatName(name).endsWith(key))
+				{
+					var bytes = haxe.Resource.getBytes(name);
+					if (bytes != null && bytes.length > 0)
+						return bytes;
+				}
+			}
+		}
+		catch (e:Dynamic)
+		{
+			lastError = Std.string(e);
+		}
+		return null;
+	}
+
+	static function flatName(value:String):String
+	{
+		var buf = new StringBuf();
+		for (i in 0...value.length)
+		{
+			var c = value.charCodeAt(i);
+			var alnum = (c >= "a".code && c <= "z".code) || (c >= "A".code && c <= "Z".code) || (c >= "0".code && c <= "9".code);
+			if (alnum)
+				buf.addChar(c);
+		}
+		return buf.toString().toLowerCase();
 	}
 
 	public static function getFreeSpace(?path:String):Float
