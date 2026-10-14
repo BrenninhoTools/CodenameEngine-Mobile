@@ -2,6 +2,7 @@ import funkin.ui.FunkinText;
 import flixel.text.FlxText;
 import flixel.text.FlxTextBorderStyle;
 import flixel.util.FlxAxes;
+import funkin.mobile.TouchUtil;
 
 var pixelScript:Script = game.scripts.getByName("pixel.hx");
 var pauseCam = new FlxCamera();
@@ -53,6 +54,7 @@ function create(event) {
 
 	FlxTween.tween(bg.scale, {y: 6}, 0.75, {ease: FlxEase.elasticOut});
 
+	if (FlxG.onMobile) addBackButton();
 
 	FlxG.sound.play(Paths.sound(isThorns ? 'pixel/ANGRY' : 'pixel/clickText'));
 }
@@ -85,7 +87,27 @@ function update(elapsed) {
 	hand.x -= hand.x % 6;
 	hand.y -= hand.y % 6;
 
-	changeSelection((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - FlxG.mouse.wheel);
+	changeSelection((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - FlxG.mouse.wheel + TouchUtil.verticalScroll);
+
+	if (FlxG.onMobile && mobileBackPressed) {
+		var resumeIndex = menuItems.indexOf("Resume");
+		if (resumeIndex >= 0) {
+			curSelected = resumeIndex;
+			enterOption();
+		}
+		return;
+	}
+
+	if (TouchUtil.tapped) {
+		for (i in 0...menuItems.length) {
+			var itemText = texts[i + 1];
+			if (itemText != null && TouchUtil.overlaps(itemText, pauseCam)) {
+				if (i == curSelected) enterOption();
+				else changeSelection(i - curSelected);
+				return;
+			}
+		}
+	}
 
 	if (controls.ACCEPT) enterOption();
 }

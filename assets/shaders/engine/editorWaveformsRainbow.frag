@@ -19,7 +19,7 @@ uniform float pixelOffset;
 uniform float playerPosition;
 
 uniform sampler2D waveformTexture;
-uniform ivec2 waveformSize;
+uniform vec2 waveformSize;
 
 uniform bool lowDetail;
 
