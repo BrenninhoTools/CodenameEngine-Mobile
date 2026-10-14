@@ -722,7 +722,7 @@ class PlayState extends MusicBeatState
 		FlxG.cameras.add(camHUD = new HudCamera(), false);
 		camHUD.bgColor.alpha = 0;
 
-		downscroll = Options.downscroll;
+		downscroll = Options.downscroll #if mobile || funkin.mobile.Hitbox.isArrowsMode() #end;
 
 		persistentUpdate = true;
 		persistentDraw = true;
@@ -850,6 +850,11 @@ class PlayState extends MusicBeatState
 
 			var strOffset:Float = canCenter || strumLine.strumLinePos != null ? (canCenter ? 0.5 : strumLine.strumLinePos) : (strumLine.type == 1 ? 0.75 : 0.25);
 			var strScale:Float = strumLine.strumScale != null ? strumLine.strumScale : 1;
+			var isPlayerLine:Bool = !(strumLine.type == 2 || (!coopMode && !((strumLine.type == 1 && !opponentMode) || (strumLine.type == 0 && opponentMode))));
+			#if mobile
+			if (isPlayerLine && funkin.mobile.Hitbox.isArrowsMode())
+				strScale *= funkin.mobile.Hitbox.ARROWS_SCALE;
+			#end
 			var strSpacing:Float = strumLine.strumSpacing == null ? 1 : strumLine.strumSpacing;
 			var keyCount:Int = strumLine.keyCount == null ? 4 : strumLine.keyCount;
 			var strXPos:Float = StrumLine.calculateStartingXPos(strOffset, strScale, strSpacing, keyCount);
@@ -858,14 +863,18 @@ class PlayState extends MusicBeatState
 				FlxPoint.get(strXPos, this.strumLine.y);
 			var strLine = new StrumLine(chars,
 				startingPos,
-				strumLine.strumScale == null ? 1 : strumLine.strumScale,
-				strumLine.type == 2 || (!coopMode && !((strumLine.type == 1 && !opponentMode) || (strumLine.type == 0 && opponentMode))),
+				strScale,
+				!isPlayerLine,
 				strumLine.type != 1, coopMode ? ((strumLine.type == 1) != opponentMode ? controlsP1 : controlsP2) : controls,
 				strumLine.vocalsSuffix
 			);
 			strLine.cameras = [camHUD];
 			strLine.data = strumLine;
 			strLine.visible = (strumLine.visible != false && (!canCenter || !strLine.cpu));
+			#if mobile
+			if (strLine.cpu && funkin.mobile.Hitbox.isArrowsMode())
+				strLine.visible = false;
+			#end
 			strLine.vocals.group = FlxG.sound.defaultMusicGroup;
 			strLine.ID = i;
 			strumLines.add(strLine);
@@ -983,8 +992,34 @@ class PlayState extends MusicBeatState
 			hitbox.cameras = [createMobileCamera()];
 			add(hitbox);
 		}
+		hitbox.arrowTargets = getMobileArrowTargets;
+		hitbox.arrowCamera = camHUD;
+		applyMobileArrowsLayout();
 		addPauseButton();
 		mobilePauseButton.alpha = Options.invisiblePauseButton ? 0 : 1;
+	}
+
+	function getMobilePlayerLine():StrumLine {
+		for (strLine in strumLines.members)
+			if (strLine != null && !strLine.cpu && strLine.members.length > 0)
+				return strLine;
+		return null;
+	}
+
+	function getMobileArrowTargets():Array<FlxSprite> {
+		var strLine = getMobilePlayerLine();
+		return strLine == null ? null : [for (strum in strLine.members) strum];
+	}
+
+	public function applyMobileArrowsLayout() {
+		if (!funkin.mobile.Hitbox.isArrowsMode()) return;
+		for (strLine in strumLines.members) {
+			if (strLine == null || strLine.cpu) continue;
+			var count = strLine.members.length;
+			for (i => strum in strLine.members)
+				if (strum != null)
+					strum.x = (FlxG.width * (i + 0.5) / count) - (strum.width / 2);
+		}
 	}
 
 	function getMobileKeyCount():Int {
@@ -1568,8 +1603,13 @@ class PlayState extends MusicBeatState
 		while(events.length > 0 && events.last().time <= Conductor.songPosition)
 			executeEvent(events.pop());
 
-		if (hitbox != null && hitbox.exists)
-			hitbox.ensureKeyCount(getMobileKeyCount());
+		if (hitbox != null && hitbox.exists) {
+			var mobileKeyCount = getMobileKeyCount();
+			if (mobileKeyCount != hitbox.keyCount) {
+				hitbox.ensureKeyCount(mobileKeyCount);
+				applyMobileArrowsLayout();
+			}
+		}
 
 		if ((controls.PAUSE || (mobilePauseButton != null && mobilePauseButton.justPressed)) && startedCountdown && canPause)
 			pauseGame();

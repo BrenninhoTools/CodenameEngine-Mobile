@@ -234,15 +234,21 @@ class TitleState extends MusicBeatState
 
 	public function loadXML() {
 		try {
-			xml = new Access(Xml.parse(Assets.getText(Paths.xml('titlescreen/titlescreen'))).firstElement());
-			if (xml.hasNode.intro) {
+			xml = loadTitleXML();
+			if (xml != null && xml.hasNode.intro) {
 				titleLines = [];
 				if (xml.node.intro.has.length) titleLength = Std.parseInt(xml.node.intro.att.length).getDefault(16);
 				for(node in xml.nodes.sprites) {
 					var parentFolder:String = node.getAtt("folder").getDefault("");
 					if (parentFolder != "" && !parentFolder.endsWith("/")) parentFolder += "/";
 					for(sprNode in node.elements) {
-						var spr = XMLUtil.createSpriteFromXML(sprNode, parentFolder);
+						var spr:FlxSprite = null;
+						try {
+							spr = XMLUtil.createSpriteFromXML(sprNode, parentFolder);
+						} catch(e) {
+							Logs.warn('Failed to create titlescreen sprite "${sprNode.name}": $e');
+						}
+						if (spr == null) continue;
 						switch(sprNode.name) {
 							case "press-enter":
 								titleText = spr;
@@ -285,6 +291,30 @@ class TitleState extends MusicBeatState
 			}
 		} catch(e) {
 			Logs.error('Failed to load titlescreen XML: $e');
+		}
+	}
+
+	function loadTitleXML():Access {
+		var path = Paths.xml('titlescreen/titlescreen');
+		var parsed:Access = parseTitleXML(Assets.exists(path) ? Assets.getText(path) : null);
+		if (parsed == null) {
+			try {
+				parsed = parseTitleXML(Paths.assetsTree.getSpecificAsset(path, "TEXT", funkin.backend.assets.AssetSource.SOURCE));
+			} catch(e) {
+				parsed = null;
+			}
+		}
+		return parsed;
+	}
+
+	function parseTitleXML(text:String):Access {
+		if (text == null || text.trim() == "") return null;
+		try {
+			var root = Xml.parse(text).firstElement();
+			return root == null ? null : new Access(root);
+		} catch(e) {
+			Logs.warn('Failed to parse titlescreen XML: $e');
+			return null;
 		}
 	}
 

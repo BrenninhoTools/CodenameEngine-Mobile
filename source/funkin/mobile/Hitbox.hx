@@ -1,18 +1,29 @@
 package funkin.mobile;
 
+import flixel.FlxCamera;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.group.FlxSpriteGroup.FlxTypedSpriteGroup;
+import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
 
 class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 {
 	public static var instance:Hitbox;
 
+	public static inline var MODE_LANES:String = "Four Lanes";
+	public static inline var MODE_ARROWS:String = "Arrows";
+	public static var MODES:Array<String> = [MODE_LANES, MODE_ARROWS];
+
+	public static var ARROWS_SCALE:Float = 1.5;
+
 	public static var laneColors:Array<FlxColor> = [0xFFC24B99, 0xFF00FFFF, 0xFF12FA05, 0xFFF9393F];
 
 	public var keyCount(default, null):Int = 4;
 	public var hintAlpha:Float = 0.25;
+
+	public var arrowTargets:Void->Array<FlxSprite> = null;
+	public var arrowCamera:FlxCamera = null;
 
 	var pressedLanes:Array<Bool> = [];
 	var justPressedLanes:Array<Bool> = [];
@@ -32,6 +43,9 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 		setKeyCount(keyCount);
 		FlxG.signals.preUpdate.add(onPreUpdate);
 	}
+
+	public static function isArrowsMode():Bool
+		return Options.hitboxMode == MODE_ARROWS;
 
 	public function setKeyCount(count:Int)
 	{
@@ -84,15 +98,25 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 		}
 
 		var currentLanes:Map<Int, Int> = new Map();
+		var world = FlxPoint.get();
+		var camera = getArrowCamera();
 
 		#if FLX_TOUCH
 		for (touch in FlxG.touches.list)
 			if (touch.pressed || touch.justPressed)
-				processPointer(touch.touchPointID, touch.gameX, touch.gameY, touch.justPressed, currentLanes);
+			{
+				touch.getWorldPosition(camera, world);
+				processPointer(touch.touchPointID, touch.gameX, touch.gameY, world.x, world.y, touch.justPressed, currentLanes);
+			}
 		#elseif FLX_MOUSE
 		if (FlxG.mouse.pressed || FlxG.mouse.justPressed)
-			processPointer(-1, FlxG.mouse.gameX, FlxG.mouse.gameY, FlxG.mouse.justPressed, currentLanes);
+		{
+			FlxG.mouse.getWorldPosition(camera, world);
+			processPointer(-1, FlxG.mouse.gameX, FlxG.mouse.gameY, world.x, world.y, FlxG.mouse.justPressed, currentLanes);
+		}
 		#end
+
+		world.put();
 
 		touchLanes = currentLanes;
 
@@ -105,9 +129,9 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 		}
 	}
 
-	function processPointer(id:Int, x:Float, y:Float, justPressed:Bool, currentLanes:Map<Int, Int>)
+	function processPointer(id:Int, x:Float, y:Float, worldX:Float, worldY:Float, justPressed:Bool, currentLanes:Map<Int, Int>)
 	{
-		var lane = getLane(x, y);
+		var lane = getLane(x, y, worldX, worldY);
 		if (lane < 0)
 			return;
 
@@ -118,16 +142,53 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 		currentLanes.set(id, lane);
 	}
 
-	function getLane(x:Float, y:Float):Int
+	function getArrowCamera():FlxCamera
+		return arrowCamera != null ? arrowCamera : FlxG.camera;
+
+	function getLane(x:Float, y:Float, worldX:Float, worldY:Float):Int
 	{
 		for (button in MobileButton.instances)
 			if (button.containsScreenPoint(x, y))
 				return -1;
 
+		if (isArrowsMode() && arrowTargets != null)
+			return getArrowLane(worldX, worldY);
+
 		var lane = Math.floor(x / (FlxG.width / keyCount));
 		if (lane < 0 || lane >= keyCount)
 			return -1;
 		return lane;
+	}
+
+	function getArrowLane(worldX:Float, worldY:Float):Int
+	{
+		var targets = arrowTargets();
+		if (targets == null)
+			return -1;
+
+		var camera = getArrowCamera();
+		var point = FlxPoint.get();
+		var best = -1;
+		var bestDistance = Math.POSITIVE_INFINITY;
+		for (i => target in targets)
+		{
+			if (target == null || !target.exists || i >= keyCount)
+				continue;
+			target.getScreenPosition(point, camera);
+			var padX = target.width * 0.35;
+			var padY = target.height * 0.6;
+			if (worldX >= point.x - padX && worldX <= point.x + target.width + padX && worldY >= point.y - padY && worldY <= point.y + target.height + padY)
+			{
+				var distance = Math.abs(worldX - (point.x + target.width / 2)) + Math.abs(worldY - (point.y + target.height / 2));
+				if (distance < bestDistance)
+				{
+					bestDistance = distance;
+					best = i;
+				}
+			}
+		}
+		point.put();
+		return best;
 	}
 
 	public function pressed(lane:Int):Bool
@@ -165,7 +226,7 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 		{
 			if (hint == null)
 				continue;
-			if (pressed(i) && !Options.invisibleHitbox)
+			if (pressed(i) && !Options.invisibleHitbox && !isArrowsMode())
 				hint.alpha = hintAlpha;
 			else if (hint.alpha > 0)
 				hint.alpha = Math.max(0, hint.alpha - elapsed * 3);
@@ -174,6 +235,8 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 
 	override function destroy()
 	{
+		arrowTargets = null;
+		arrowCamera = null;
 		FlxG.signals.preUpdate.remove(onPreUpdate);
 		if (instance == this)
 			instance = null;
