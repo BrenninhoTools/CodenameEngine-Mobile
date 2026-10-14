@@ -984,6 +984,7 @@ class PlayState extends MusicBeatState
 			add(hitbox);
 		}
 		addPauseButton();
+		mobilePauseButton.alpha = Options.invisiblePauseButton ? 0 : 1;
 	}
 
 	function getMobileKeyCount():Int {

@@ -7,6 +7,7 @@ class MobileOptions extends TreeMenuScreen {
 		super('optionsTree.mobile-name', 'optionsTree.mobile-desc', 'MobileOptions.');
 
 		add(new Checkbox(getNameID('invisibleHitbox'), getDescID('invisibleHitbox'), 'invisibleHitbox'));
+		add(new Checkbox(getNameID('invisiblePauseButton'), getDescID('invisiblePauseButton'), 'invisiblePauseButton'));
 
 		#if android
 		Options.storageType = StorageUtil.getStorageType();

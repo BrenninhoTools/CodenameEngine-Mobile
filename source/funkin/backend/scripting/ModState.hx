@@ -35,4 +35,11 @@ class ModState extends MusicBeatState {
 		data = lastData;
 		super(true, lastName);
 	}
+
+	public override function createPost() {
+		super.createPost();
+		#if mobile
+		addBackButton();
+		#end
+	}
 }

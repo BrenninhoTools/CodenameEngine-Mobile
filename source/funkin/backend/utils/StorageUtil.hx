@@ -15,8 +15,10 @@ class StorageUtil
 	public static final ADDONS_FOLDER:String = "addons";
 
 	public static final STORAGE_DATA:String = "Data";
+	public static final STORAGE_MEDIA:String = "Media";
+	public static final STORAGE_OBB:String = "Obb";
 	public static final STORAGE_EXTERNAL:String = "External";
-	public static final STORAGE_TYPES:Array<String> = [STORAGE_DATA, STORAGE_EXTERNAL];
+	public static final STORAGE_TYPES:Array<String> = [STORAGE_DATA, STORAGE_MEDIA, STORAGE_OBB, STORAGE_EXTERNAL];
 
 	public static final EXTERNAL_FOLDER:String = ".CodenameEngine";
 	static final STORAGE_TYPE_FILE:String = "storage_type.txt";
@@ -37,7 +39,29 @@ class StorageUtil
 	{
 		#if android
 		activeStorageType = STORAGE_DATA;
-		if (getStorageType() == STORAGE_EXTERNAL)
+		var type = getStorageType();
+		if (type == STORAGE_MEDIA || type == STORAGE_OBB)
+		{
+			var path:String = null;
+			try
+			{
+				path = type == STORAGE_MEDIA ? AndroidStorage.getExternalMediaDirectory() : Context.getObbDir();
+			}
+			catch (e:Dynamic)
+			{
+				path = null;
+			}
+			if (path != null && path.length > 0)
+			{
+				path = Path.addTrailingSlash(path);
+				if (createDirectory(path))
+				{
+					activeStorageType = type;
+					return path;
+				}
+			}
+		}
+		else if (type == STORAGE_EXTERNAL)
 		{
 			if (AndroidStorage.hasStoragePermission())
 			{
@@ -173,6 +197,19 @@ class AndroidStorage
 		try
 		{
 			var method:Dynamic = lime.system.JNI.createStaticMethod(HELPER_CLASS, "getExternalStorageDirectory", "()Ljava/lang/String;");
+			return method == null ? null : method();
+		}
+		catch (e:Dynamic)
+		{
+			return null;
+		}
+	}
+
+	public static function getExternalMediaDirectory():String
+	{
+		try
+		{
+			var method:Dynamic = lime.system.JNI.createStaticMethod(HELPER_CLASS, "getExternalMediaDirectory", "()Ljava/lang/String;");
 			return method == null ? null : method();
 		}
 		catch (e:Dynamic)

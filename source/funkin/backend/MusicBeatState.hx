@@ -152,6 +152,10 @@ class MusicBeatState extends FlxState implements IBeatCancellableReceiver
 	public override function tryUpdate(elapsed:Float):Void
 	{
 		if (persistentUpdate || subState == null) {
+			#if mobile
+			if (subState == null && mobileBackPressed)
+				funkin.mobile.MobileControls.trigger(controls, BACK);
+			#end
 			callOne("preUpdate", elapsed);
 			update(elapsed);
 			callOne("postUpdate", elapsed);

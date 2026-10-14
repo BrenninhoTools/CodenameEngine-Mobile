@@ -37,8 +37,6 @@ class MainMenuState extends MusicBeatState
 
 	override function create()
 	{
-		if (optionShit.length == 0)
-			optionShit = getDefaultMenuItems();
 
 		super.create();
 
@@ -222,20 +220,6 @@ class MainMenuState extends MusicBeatState
 			}
 		});
 	}
-	function getDefaultMenuItems():Array<String> {
-		var items:Array<String> = [];
-		try {
-			var text:String = Paths.assetsTree.getSpecificAsset(Paths.txt("config/menuItems"), "TEXT", funkin.backend.assets.AssetSource.SOURCE);
-			if (text != null)
-				for (line in text.split("\n")) {
-					var trim = line.trim();
-					if (trim != "" && !trim.startsWith("#")) items.push(trim);
-				}
-		} catch (e:Dynamic) {}
-		if (items.length == 0) items = ["story mode", "freeplay", "credits", "options"];
-		return items;
-	}
-
 	function changeItem(huh:Int = 0)
 	{
 		if (menuItems == null || menuItems.length == 0) return;

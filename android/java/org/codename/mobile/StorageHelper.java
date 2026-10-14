@@ -22,6 +22,25 @@ public class StorageHelper {
 		return directory == null ? "" : directory.getAbsolutePath();
 	}
 
+	public static String getExternalMediaDirectory() {
+		if (Extension.mainContext == null) {
+			return "";
+		}
+
+		File[] directories = Extension.mainContext.getExternalMediaDirs();
+		if (directories != null) {
+			for (File directory : directories) {
+				if (directory != null) {
+					if (!directory.exists()) {
+						directory.mkdirs();
+					}
+					return directory.getAbsolutePath();
+				}
+			}
+		}
+		return "";
+	}
+
 	public static boolean hasStoragePermission() {
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
 			return Environment.isExternalStorageManager();

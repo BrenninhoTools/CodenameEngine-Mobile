@@ -177,8 +177,10 @@
 	<group name="MobileOptions" prefix="MobileOptions.">
 		<str id="invisibleHitbox-name">Invisible Hitbox</str>
 		<str id="invisibleHitbox-desc">If checked, the hitbox lanes will not light up when you touch them.</str>
+		<str id="invisiblePauseButton-name">Invisible Pause Button</str>
+		<str id="invisiblePauseButton-desc">If checked, the pause button will be invisible during songs, but you can still tap it to pause.</str>
 		<str id="storageType-name">Storage Type</str>
-		<str id="storageType-desc">Where the mods, addons and extracted assets are stored. Data uses Android/data, External uses a .CodenameEngine folder in the internal storage. Restart the game to apply.</str>
+		<str id="storageType-desc">Where the mods, addons and extracted assets are stored. Data uses Android/data, Media uses Android/media, Obb uses Android/obb and External uses a .CodenameEngine folder in the internal storage. Restart the game to apply.</str>
 		<str id="storageType-restart">Restart the game to apply the new Storage Type.</str>
 	</group>
 
