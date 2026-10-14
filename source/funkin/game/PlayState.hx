@@ -1018,7 +1018,7 @@ class PlayState extends MusicBeatState
 			var count = strLine.members.length;
 			for (i => strum in strLine.members)
 				if (strum != null)
-					strum.x = (FlxG.width * (i + 0.5) / count) - (strum.width / 2);
+					strum.x = (FlxG.width * ((1 - funkin.mobile.Hitbox.ARROWS_SPREAD) / 2 + funkin.mobile.Hitbox.ARROWS_SPREAD * (i + 0.5) / count)) - (strum.width / 2);
 		}
 	}
 

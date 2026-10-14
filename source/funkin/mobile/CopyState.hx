@@ -7,23 +7,44 @@ import flixel.text.FlxText;
 import flixel.util.FlxColor;
 import funkin.backend.system.MainState;
 import funkin.backend.utils.StorageUtil;
-import haxe.io.Path;
 #if sys
 import sys.FileSystem;
 import sys.io.File;
 #end
 
+private enum CopyKind
+{
+	ASSET;
+	BUNDLED;
+	MIGRATE;
+}
+
+private typedef CopyJob =
+{
+	var kind:CopyKind;
+	var source:String;
+	var target:String;
+}
+
 class CopyState extends FlxState
 {
 	public static final ASSETS_FOLDER:String = "assets/";
 	public static final VERSION_FILE:String = "assets/.version";
+	public static final BUNDLED_FOLDERS:Array<String> = ["mods/", "addons/"];
 
-	static var _files:Array<String> = null;
+	static inline var MAX_RETRIES:Int = 2;
+	static inline var FRAME_BUDGET:Float = 0.03;
 
-	var files:Array<String> = [];
+	static var _assetFiles:Array<String> = null;
+	static var _bundledFiles:Array<String> = null;
+
+	var jobs:Array<CopyJob> = [];
+	var retryJobs:Array<CopyJob> = [];
+	var failedJobs:Array<CopyJob> = [];
 	var index:Int = 0;
-	var failed:Int = 0;
+	var attempt:Int = 0;
 	var overwrite:Bool = false;
+	var migrationSource:String = null;
 
 	var statusText:FlxText;
 	var progressText:FlxText;
@@ -33,29 +54,83 @@ class CopyState extends FlxState
 	public static function getVersionKey():String
 		return funkin.backend.system.macros.GitCommitMacro.commitHash + "-" + lime.app.Application.current.meta.get("version");
 
-	public static function getFilesToCopy():Array<String>
+	static function collectAssetLists()
 	{
-		if (_files == null)
-			_files = [for (id in lime.utils.Assets.list()) if (id.startsWith(ASSETS_FOLDER)) id];
-		return _files;
+		if (_assetFiles != null)
+			return;
+		_assetFiles = [];
+		_bundledFiles = [];
+		for (id in lime.utils.Assets.list())
+		{
+			if (id.startsWith(ASSETS_FOLDER))
+				_assetFiles.push(id);
+			else
+				for (folder in BUNDLED_FOLDERS)
+					if (id.startsWith(folder))
+					{
+						_bundledFiles.push(id);
+						break;
+					}
+		}
 	}
 
-	public static function needsCopy():Bool
+	public static function getFilesToCopy():Array<String>
 	{
-		#if (sys && mobile)
+		collectAssetLists();
+		return _assetFiles;
+	}
+
+	public static function getBundledFiles():Array<String>
+	{
+		collectAssetLists();
+		return _bundledFiles;
+	}
+
+	static function isVersionOutdated():Bool
+	{
+		#if sys
 		var versionPath = StorageUtil.storageDirectory + VERSION_FILE;
 		try
 		{
-			if (!FileSystem.exists(versionPath) || File.getContent(versionPath).trim() != getVersionKey())
-				return true;
+			return !FileSystem.exists(versionPath) || File.getContent(versionPath).trim() != getVersionKey();
 		}
 		catch (e:Dynamic)
 		{
 			return true;
 		}
+		#else
+		return false;
+		#end
+	}
+
+	static function missing(relative:String):Bool
+	{
+		#if sys
+		try
+		{
+			return !FileSystem.exists(StorageUtil.storageDirectory + relative);
+		}
+		catch (e:Dynamic)
+		{
+			return true;
+		}
+		#else
+		return false;
+		#end
+	}
+
+	public static function needsCopy():Bool
+	{
+		#if (sys && mobile)
+		if (isVersionOutdated() || StorageUtil.getPreviousDirectory() != null)
+			return true;
 		for (id in getFilesToCopy())
-			if (!FileSystem.exists(StorageUtil.storageDirectory + id))
+			if (missing(id))
 				return true;
+		for (id in getBundledFiles())
+			if (missing(id))
+				return true;
+		StorageUtil.saveCurrentDirectory();
 		#end
 		return false;
 	}
@@ -65,23 +140,26 @@ class CopyState extends FlxState
 		super.create();
 
 		#if (sys && mobile)
-		var versionPath = StorageUtil.storageDirectory + VERSION_FILE;
-		try
-		{
-			overwrite = FileSystem.exists(versionPath) && File.getContent(versionPath).trim() != getVersionKey();
-		}
-		catch (e:Dynamic)
-		{
-			overwrite = true;
-		}
+		var root = StorageUtil.storageDirectory;
+		var hasVersion = FileSystem.exists(root + VERSION_FILE);
+		overwrite = hasVersion && isVersionOutdated();
 
-		files = [
-			for (id in getFilesToCopy())
-				if (overwrite || !FileSystem.exists(StorageUtil.storageDirectory + id)) id
-		];
+		for (id in getFilesToCopy())
+			if (overwrite || missing(id))
+				jobs.push({kind: ASSET, source: id, target: root + id});
+
+		for (id in getBundledFiles())
+			if (missing(id))
+				jobs.push({kind: BUNDLED, source: id, target: root + id});
+
+		migrationSource = StorageUtil.getPreviousDirectory();
+		if (migrationSource != null)
+			for (file in StorageUtil.getMigrationFiles())
+				if (!file.endsWith(".tmp") && missing(file))
+					jobs.push({kind: MIGRATE, source: migrationSource + file, target: root + file});
 		#end
 
-		statusText = new FlxText(0, FlxG.height * 0.4, FlxG.width, "Extracting assets...", 32);
+		statusText = new FlxText(0, FlxG.height * 0.4, FlxG.width, getStatus(), 32);
 		statusText.alignment = CENTER;
 		add(statusText);
 
@@ -98,56 +176,71 @@ class CopyState extends FlxState
 		add(progressText);
 	}
 
+	function getStatus():String
+	{
+		if (attempt > 0)
+			return "Retrying failed files...";
+		if (index < jobs.length)
+			return switch (jobs[index].kind)
+			{
+				case ASSET: "Extracting assets...";
+				case BUNDLED: "Extracting mods...";
+				case MIGRATE: "Moving mods to the new storage...";
+			}
+		return "Finishing...";
+	}
+
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
 
+		if (finished)
+			return;
+
 		#if (sys && mobile)
 		var start = haxe.Timer.stamp();
-		while (index < files.length && haxe.Timer.stamp() - start < 0.03)
+		while (index < jobs.length && haxe.Timer.stamp() - start < FRAME_BUDGET)
 		{
-			copyFile(files[index]);
+			var job = jobs[index];
+			if (!runJob(job))
+				retryJobs.push(job);
 			index++;
 		}
 		#end
 
-		var progress = files.length == 0 ? 1 : index / files.length;
+		var progress = jobs.length == 0 ? 1 : index / jobs.length;
 		progressBar.scale.x = progress;
-		progressText.text = '$index / ${files.length}' + (failed > 0 ? ' ($failed failed)' : '');
+		statusText.text = getStatus();
+		progressText.text = '$index / ${jobs.length}' + (retryJobs.length > 0 ? ' (${retryJobs.length} to retry)' : '');
 
-		if (index >= files.length)
-			finish();
+		if (index >= jobs.length)
+		{
+			if (retryJobs.length > 0 && attempt < MAX_RETRIES)
+			{
+				attempt++;
+				jobs = retryJobs;
+				retryJobs = [];
+				index = 0;
+			}
+			else
+			{
+				failedJobs = retryJobs;
+				retryJobs = [];
+				finish();
+			}
+		}
 	}
 
-	function copyFile(id:String)
+	function runJob(job:CopyJob):Bool
 	{
 		#if (sys && mobile)
-		try
+		return switch (job.kind)
 		{
-			var target = StorageUtil.storageDirectory + id;
-			createFolders(Path.directory(target));
-			var bytes = lime.utils.Assets.getBytes(id);
-			if (bytes == null)
-			{
-				failed++;
-				return;
-			}
-			File.saveBytes(target, bytes);
+			case ASSET, BUNDLED: StorageUtil.copyAsset(job.source, job.target);
+			case MIGRATE: StorageUtil.copyFile(job.source, job.target);
 		}
-		catch (e:Dynamic)
-		{
-			failed++;
-		}
-		#end
-	}
-
-	function createFolders(path:String)
-	{
-		#if sys
-		if (path == null || path.length == 0 || FileSystem.exists(path))
-			return;
-		createFolders(Path.directory(path));
-		StorageUtil.createDirectory(path);
+		#else
+		return true;
 		#end
 	}
 
@@ -160,14 +253,44 @@ class CopyState extends FlxState
 		finished = true;
 
 		#if (sys && mobile)
-		try
+		var root = StorageUtil.storageDirectory;
+		StorageUtil.cleanTempFiles(root, "assets");
+		var assetsFailed = false;
+		for (job in failedJobs)
 		{
-			File.saveContent(StorageUtil.storageDirectory + VERSION_FILE, getVersionKey());
+			funkin.mobile.MobileLog.write('[CopyState] Failed to copy ${job.source} -> ${job.target}' + (StorageUtil.lastError != null ? ' (${StorageUtil.lastError})' : ''));
+			if (job.kind == ASSET)
+				assetsFailed = true;
 		}
-		catch (e:Dynamic) {}
+
+		if (!assetsFailed)
+		{
+			try
+			{
+				File.saveContent(root + VERSION_FILE, getVersionKey());
+			}
+			catch (e:Dynamic) {}
+		}
+
+		var migrationFailed = false;
+		for (job in failedJobs)
+			if (job.kind == MIGRATE)
+				migrationFailed = true;
+		if (!migrationFailed)
+			StorageUtil.saveCurrentDirectory();
 		#end
 
-		_files = null;
-		FlxG.switchState(new MainState());
+		_assetFiles = null;
+		_bundledFiles = null;
+
+		if (failedJobs.length > 0)
+		{
+			statusText.text = '${failedJobs.length} files could not be copied.\nCheck logs/latest.log for details.';
+			statusText.color = FlxColor.YELLOW;
+			progressText.text = "";
+			new flixel.util.FlxTimer().start(3, (_) -> FlxG.switchState(new MainState()));
+		}
+		else
+			FlxG.switchState(new MainState());
 	}
 }

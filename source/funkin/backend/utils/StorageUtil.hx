@@ -1,5 +1,6 @@
 package funkin.backend.utils;
 
+import haxe.io.Bytes;
 import haxe.io.Path;
 #if android
 import extension.androidtools.content.Context;
@@ -13,6 +14,8 @@ class StorageUtil
 {
 	public static final MODS_FOLDER:String = "mods";
 	public static final ADDONS_FOLDER:String = "addons";
+	public static final ASSETS_FOLDER:String = "assets";
+	public static final LOGS_FOLDER:String = "logs";
 
 	public static final STORAGE_DATA:String = "Data";
 	public static final STORAGE_MEDIA:String = "Media";
@@ -21,10 +24,16 @@ class StorageUtil
 	public static final STORAGE_TYPES:Array<String> = [STORAGE_DATA, STORAGE_MEDIA, STORAGE_OBB, STORAGE_EXTERNAL];
 
 	public static final EXTERNAL_FOLDER:String = ".CodenameEngine";
+	public static final USER_FOLDERS:Array<String> = [MODS_FOLDER, ADDONS_FOLDER];
+
 	static final STORAGE_TYPE_FILE:String = "storage_type.txt";
+	static final STORAGE_PATH_FILE:String = "storage_path.txt";
+	static final WRITE_TEST_FILE:String = ".write_test";
+	static final COPY_BUFFER_SIZE:Int = 65536;
 
 	public static var storageDirectory(get, never):String;
 	public static var activeStorageType(default, null):String = STORAGE_DATA;
+	public static var lastError(default, null):String = null;
 
 	static var _storageDirectory:String = null;
 
@@ -40,44 +49,11 @@ class StorageUtil
 		#if android
 		activeStorageType = STORAGE_DATA;
 		var type = getStorageType();
-		if (type == STORAGE_MEDIA || type == STORAGE_OBB)
+		var path = getDirectoryForType(type);
+		if (path != null && isWritable(path))
 		{
-			var path:String = null;
-			try
-			{
-				path = type == STORAGE_MEDIA ? AndroidStorage.getExternalMediaDirectory() : Context.getObbDir();
-			}
-			catch (e:Dynamic)
-			{
-				path = null;
-			}
-			if (path != null && path.length > 0)
-			{
-				path = Path.addTrailingSlash(path);
-				if (createDirectory(path))
-				{
-					activeStorageType = type;
-					return path;
-				}
-			}
-		}
-		else if (type == STORAGE_EXTERNAL)
-		{
-			if (AndroidStorage.hasStoragePermission())
-			{
-				var external = AndroidStorage.getExternalStorageDirectory();
-				if (external != null && external.length > 0)
-				{
-					var path = Path.addTrailingSlash(Path.addTrailingSlash(external) + EXTERNAL_FOLDER);
-					if (createDirectory(path))
-					{
-						activeStorageType = STORAGE_EXTERNAL;
-						return path;
-					}
-				}
-			}
-			else
-				AndroidStorage.requestStoragePermission();
+			activeStorageType = type;
+			return path;
 		}
 		return getDataDirectory();
 		#elseif (ios || switch)
@@ -86,6 +62,41 @@ class StorageUtil
 		return Path.addTrailingSlash(Sys.getCwd());
 		#else
 		return "";
+		#end
+	}
+
+	public static function getDirectoryForType(type:String):String
+	{
+		#if android
+		var path:String = null;
+		try
+		{
+			switch (type)
+			{
+				case STORAGE_MEDIA:
+					path = AndroidStorage.getExternalMediaDirectory();
+				case STORAGE_OBB:
+					path = Context.getObbDir();
+				case STORAGE_EXTERNAL:
+					if (AndroidStorage.hasStoragePermission())
+					{
+						var external = AndroidStorage.getExternalStorageDirectory();
+						if (external != null && external.length > 0)
+							path = Path.addTrailingSlash(external) + EXTERNAL_FOLDER;
+					}
+					else
+						AndroidStorage.requestStoragePermission();
+				default:
+					path = getDataDirectory();
+			}
+		}
+		catch (e:Dynamic)
+		{
+			path = null;
+		}
+		return (path == null || path.length == 0) ? null : Path.addTrailingSlash(path);
+		#else
+		return storageDirectory;
 		#end
 	}
 
@@ -101,46 +112,52 @@ class StorageUtil
 		{
 			path = null;
 		}
-		if (path == null || path.length == 0)
+		if (path == null || path.length == 0 || !isWritable(Path.addTrailingSlash(path)))
 			path = Context.getFilesDir();
 		return Path.addTrailingSlash(path);
 	}
 	#end
 
-	static function getSettingsPath():String
-		return Path.addTrailingSlash(lime.system.System.applicationStorageDirectory) + STORAGE_TYPE_FILE;
+	static function getSettingsDirectory():String
+		return Path.addTrailingSlash(lime.system.System.applicationStorageDirectory);
 
-	public static function getStorageType():String
+	static function readSetting(file:String):String
 	{
 		#if sys
 		try
 		{
-			var path = getSettingsPath();
+			var path = getSettingsDirectory() + file;
 			if (FileSystem.exists(path))
-			{
-				var type = File.getContent(path).trim();
-				if (STORAGE_TYPES.contains(type))
-					return type;
-			}
+				return File.getContent(path).trim();
 		}
 		catch (e:Dynamic) {}
 		#end
-		return STORAGE_DATA;
+		return null;
+	}
+
+	static function writeSetting(file:String, value:String)
+	{
+		#if sys
+		try
+		{
+			createDirectory(getSettingsDirectory());
+			File.saveContent(getSettingsDirectory() + file, value);
+		}
+		catch (e:Dynamic) {}
+		#end
+	}
+
+	public static function getStorageType():String
+	{
+		var type = readSetting(STORAGE_TYPE_FILE);
+		return (type != null && STORAGE_TYPES.contains(type)) ? type : STORAGE_DATA;
 	}
 
 	public static function setStorageType(type:String)
 	{
 		if (!STORAGE_TYPES.contains(type))
 			type = STORAGE_DATA;
-
-		#if sys
-		try
-		{
-			createDirectory(Path.directory(getSettingsPath()));
-			File.saveContent(getSettingsPath(), type);
-		}
-		catch (e:Dynamic) {}
-		#end
+		writeSetting(STORAGE_TYPE_FILE, type);
 
 		#if android
 		if (type == STORAGE_EXTERNAL && !AndroidStorage.hasStoragePermission())
@@ -157,9 +174,65 @@ class StorageUtil
 		var path = storageDirectory;
 		createDirectory(path);
 		Sys.setCwd(path);
-		createDirectory(path + MODS_FOLDER);
-		createDirectory(path + ADDONS_FOLDER);
+		for (folder in USER_FOLDERS)
+			createDirectory(path + folder);
 		#end
+	}
+
+	public static function getPreviousDirectory():String
+	{
+		#if sys
+		var previous = readSetting(STORAGE_PATH_FILE);
+		if (previous == null || previous.length == 0)
+			return null;
+		previous = Path.addTrailingSlash(previous);
+		if (normalize(previous) == normalize(storageDirectory))
+			return null;
+		try
+		{
+			if (FileSystem.exists(previous) && FileSystem.isDirectory(previous))
+				return previous;
+		}
+		catch (e:Dynamic) {}
+		#end
+		return null;
+	}
+
+	public static function saveCurrentDirectory()
+		writeSetting(STORAGE_PATH_FILE, storageDirectory);
+
+	public static function getMigrationFiles():Array<String>
+	{
+		var previous = getPreviousDirectory();
+		if (previous == null)
+			return [];
+		var files:Array<String> = [];
+		for (folder in USER_FOLDERS)
+			listFiles(previous, folder, files);
+		return files;
+	}
+
+	public static function listFiles(root:String, relative:String, ?result:Array<String>):Array<String>
+	{
+		if (result == null)
+			result = [];
+		#if sys
+		var full = Path.addTrailingSlash(root) + relative;
+		try
+		{
+			if (!FileSystem.exists(full))
+				return result;
+			if (!FileSystem.isDirectory(full))
+			{
+				result.push(relative);
+				return result;
+			}
+			for (entry in FileSystem.readDirectory(full))
+				listFiles(root, relative + "/" + entry, result);
+		}
+		catch (e:Dynamic) {}
+		#end
+		return result;
 	}
 
 	public static inline function getModsPath():String
@@ -171,20 +244,188 @@ class StorageUtil
 	public static function createDirectory(path:String):Bool
 	{
 		#if sys
+		if (path == null || path.length == 0)
+			return false;
 		try
 		{
-			if (!FileSystem.exists(path))
-				FileSystem.createDirectory(path);
-			return true;
+			if (FileSystem.exists(path))
+				return FileSystem.isDirectory(path);
+			var parent = Path.directory(Path.removeTrailingSlashes(path));
+			if (parent != null && parent.length > 0 && parent != path && !FileSystem.exists(parent))
+				createDirectory(parent);
+			FileSystem.createDirectory(path);
+			return FileSystem.exists(path);
 		}
 		catch (e:Dynamic)
 		{
+			lastError = Std.string(e);
 			return false;
 		}
 		#else
 		return false;
 		#end
 	}
+
+	public static function isWritable(path:String):Bool
+	{
+		#if sys
+		if (!createDirectory(path))
+			return false;
+		var test = Path.addTrailingSlash(path) + WRITE_TEST_FILE;
+		try
+		{
+			File.saveContent(test, "ok");
+			var ok = FileSystem.exists(test);
+			FileSystem.deleteFile(test);
+			return ok;
+		}
+		catch (e:Dynamic)
+		{
+			lastError = Std.string(e);
+			return false;
+		}
+		#else
+		return false;
+		#end
+	}
+
+	public static function saveBytes(target:String, bytes:Bytes):Bool
+	{
+		#if sys
+		if (bytes == null)
+			return false;
+		var temp = target + ".tmp";
+		try
+		{
+			createDirectory(Path.directory(target));
+			File.saveBytes(temp, bytes);
+			if (FileSystem.exists(target))
+				FileSystem.deleteFile(target);
+			FileSystem.rename(temp, target);
+			return FileSystem.exists(target);
+		}
+		catch (e:Dynamic)
+		{
+			lastError = Std.string(e);
+			deleteQuietly(temp);
+			return false;
+		}
+		#else
+		return false;
+		#end
+	}
+
+	public static function copyFile(source:String, target:String):Bool
+	{
+		#if sys
+		var temp = target + ".tmp";
+		var input:sys.io.FileInput = null;
+		var output:sys.io.FileOutput = null;
+		try
+		{
+			createDirectory(Path.directory(target));
+			input = File.read(source, true);
+			output = File.write(temp, true);
+			var buffer = Bytes.alloc(COPY_BUFFER_SIZE);
+			while (true)
+			{
+				var read = 0;
+				try
+				{
+					read = input.readBytes(buffer, 0, COPY_BUFFER_SIZE);
+				}
+				catch (e:haxe.io.Eof)
+				{
+					read = 0;
+				}
+				if (read <= 0)
+					break;
+				output.writeBytes(buffer, 0, read);
+			}
+			input.close();
+			input = null;
+			output.close();
+			output = null;
+			if (FileSystem.exists(target))
+				FileSystem.deleteFile(target);
+			FileSystem.rename(temp, target);
+			return FileSystem.exists(target);
+		}
+		catch (e:Dynamic)
+		{
+			lastError = Std.string(e);
+			try
+			{
+				if (input != null)
+					input.close();
+			}
+			catch (_:Dynamic) {}
+			try
+			{
+				if (output != null)
+					output.close();
+			}
+			catch (_:Dynamic) {}
+			deleteQuietly(temp);
+			return false;
+		}
+		#else
+		return false;
+		#end
+	}
+
+	public static function copyAsset(id:String, target:String):Bool
+	{
+		#if android
+		try
+		{
+			var path = lime.utils.Assets.getPath(id);
+			if (path != null && AndroidStorage.copyAsset(path, target))
+				return true;
+		}
+		catch (e:Dynamic) {}
+		#end
+		try
+		{
+			return saveBytes(target, lime.utils.Assets.getBytes(id));
+		}
+		catch (e:Dynamic)
+		{
+			lastError = Std.string(e);
+			return false;
+		}
+	}
+
+	public static function getFreeSpace(?path:String):Float
+	{
+		#if android
+		return AndroidStorage.getFreeSpace(path == null ? storageDirectory : path);
+		#else
+		return -1;
+		#end
+	}
+
+	public static function deleteQuietly(path:String)
+	{
+		#if sys
+		try
+		{
+			if (FileSystem.exists(path) && !FileSystem.isDirectory(path))
+				FileSystem.deleteFile(path);
+		}
+		catch (e:Dynamic) {}
+		#end
+	}
+
+	public static function cleanTempFiles(root:String, relative:String)
+	{
+		for (file in listFiles(root, relative))
+			if (file.endsWith(".tmp"))
+				deleteQuietly(Path.addTrailingSlash(root) + file);
+	}
+
+	static function normalize(path:String):String
+		return Path.removeTrailingSlashes(Path.normalize(path)).toLowerCase();
 }
 
 #if android
@@ -192,11 +433,32 @@ class AndroidStorage
 {
 	static final HELPER_CLASS:String = "org/codename/mobile/StorageHelper";
 
+	static var methods:Map<String, Dynamic> = new Map();
+
+	static function getMethod(name:String, signature:String):Dynamic
+	{
+		var key = name + signature;
+		if (!methods.exists(key))
+		{
+			var method:Dynamic = null;
+			try
+			{
+				method = lime.system.JNI.createStaticMethod(HELPER_CLASS, name, signature);
+			}
+			catch (e:Dynamic)
+			{
+				method = null;
+			}
+			methods.set(key, method);
+		}
+		return methods.get(key);
+	}
+
 	public static function getExternalStorageDirectory():String
 	{
 		try
 		{
-			var method:Dynamic = lime.system.JNI.createStaticMethod(HELPER_CLASS, "getExternalStorageDirectory", "()Ljava/lang/String;");
+			var method = getMethod("getExternalStorageDirectory", "()Ljava/lang/String;");
 			return method == null ? null : method();
 		}
 		catch (e:Dynamic)
@@ -209,7 +471,7 @@ class AndroidStorage
 	{
 		try
 		{
-			var method:Dynamic = lime.system.JNI.createStaticMethod(HELPER_CLASS, "getExternalMediaDirectory", "()Ljava/lang/String;");
+			var method = getMethod("getExternalMediaDirectory", "()Ljava/lang/String;");
 			return method == null ? null : method();
 		}
 		catch (e:Dynamic)
@@ -222,7 +484,7 @@ class AndroidStorage
 	{
 		try
 		{
-			var method:Dynamic = lime.system.JNI.createStaticMethod(HELPER_CLASS, "hasStoragePermission", "()Z");
+			var method = getMethod("hasStoragePermission", "()Z");
 			return method != null && method() == true;
 		}
 		catch (e:Dynamic)
@@ -235,11 +497,40 @@ class AndroidStorage
 	{
 		try
 		{
-			var method:Dynamic = lime.system.JNI.createStaticMethod(HELPER_CLASS, "requestStoragePermission", "()V");
+			var method = getMethod("requestStoragePermission", "()V");
 			if (method != null)
 				method();
 		}
 		catch (e:Dynamic) {}
+	}
+
+	public static function copyAsset(assetPath:String, targetPath:String):Bool
+	{
+		try
+		{
+			var method = getMethod("copyAsset", "(Ljava/lang/String;Ljava/lang/String;)Z");
+			return method != null && method(assetPath, targetPath) == true;
+		}
+		catch (e:Dynamic)
+		{
+			return false;
+		}
+	}
+
+	public static function getFreeSpace(path:String):Float
+	{
+		try
+		{
+			var method = getMethod("getFreeSpace", "(Ljava/lang/String;)D");
+			if (method == null)
+				return -1;
+			var value:Dynamic = method(path);
+			return value == null ? -1 : value;
+		}
+		catch (e:Dynamic)
+		{
+			return -1;
+		}
 	}
 }
 #end
