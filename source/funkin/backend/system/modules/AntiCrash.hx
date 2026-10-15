@@ -74,6 +74,7 @@ class AntiCrash
 			return;
 		initialized = true;
 		AntiCrashSession.init();
+		funkin.backend.assets.ModGuard.init();
 	}
 
 	public static function guard(context:String, func:Void->Void):Bool

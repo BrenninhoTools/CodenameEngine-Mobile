@@ -88,9 +88,24 @@ class ZipFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 	}
 
 	public var _parsedAsset:String;
+	inline function guardKey():String
+		return '$basePath:$_parsedAsset';
+
 	public override function getAudioBuffer(id:String):AudioBuffer {
 		__parseAsset(id);
+		#if mobile
+		var key = guardKey();
+		var bytes:Bytes = null;
+		try bytes = unzip(assets[_parsedAsset]) catch (_:Dynamic) bytes = null;
+		if (!ModGuard.validateAudioBytes(key, bytes)) return null;
+		var buffer:AudioBuffer = null;
+		ModGuard.beginLoad(key);
+		try buffer = AudioBuffer.fromBytes(bytes) catch (_:Dynamic) buffer = null;
+		ModGuard.endLoad();
+		return buffer;
+		#else
 		return AudioBuffer.fromBytes(unzip(assets[_parsedAsset]));
+		#end
 	}
 	public override function getBytes(id:String):Bytes {
 		__parseAsset(id);
@@ -98,11 +113,39 @@ class ZipFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 	}
 	public override function getFont(id:String):Font {
 		__parseAsset(id);
+		#if mobile
+		var key = guardKey();
+		var bytes:Bytes = null;
+		try bytes = unzip(assets[_parsedAsset]) catch (_:Dynamic) bytes = null;
+		if (!ModGuard.validateFont(key, bytes)) return null;
+		var font:Font = null;
+		ModGuard.beginLoad(key);
+		try font = Font.fromBytes(bytes) catch (_:Dynamic) font = null;
+		ModGuard.endLoad();
+		return ModsFolder.registerFont(font);
+		#else
 		return ModsFolder.registerFont(Font.fromBytes(unzip(assets[_parsedAsset])));
+		#end
 	}
 	public override function getImage(id:String):Image {
 		__parseAsset(id);
+		#if mobile
+		var key = guardKey();
+		var bytes:Bytes = null;
+		try bytes = unzip(assets[_parsedAsset]) catch (_:Dynamic) bytes = null;
+		if (!ModGuard.validateImage(key, bytes)) return null;
+		var image:Image = null;
+		ModGuard.beginLoad(key);
+		try image = Image.fromBytes(bytes) catch (_:Dynamic) image = null;
+		ModGuard.endLoad();
+		if (image == null || image.width <= 0 || image.height <= 0) {
+			ModGuard.block(key, "image could not be decoded");
+			return null;
+		}
+		return image;
+		#else
 		return Image.fromBytes(unzip(assets[_parsedAsset]));
+		#end
 	}
 
 	public override function getPath(id:String):String {
@@ -137,8 +180,11 @@ class ZipFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 
 	public override function exists(asset:String, type:String):Bool {
 		if(!__parseAsset(asset)) return false;
-
-		return assets[_parsedAsset] != null;
+		if (assets[_parsedAsset] == null) return false;
+		#if mobile
+		if (ModGuard.isBlocked(guardKey())) return false;
+		#end
+		return true;
 	}
 
 	private inline function getAssetPath() {

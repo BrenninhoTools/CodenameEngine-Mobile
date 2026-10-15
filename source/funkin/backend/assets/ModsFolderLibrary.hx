@@ -19,6 +19,7 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 	public var libName:String;
 	//public var useImageCache:Bool = true;
 	public var prefix = 'assets/';
+	public var guarded:Bool = false;
 
 	public function new(basePath:String, libName:String, ?modName:String) {
 		#if (MOD_SUPPORT && CASE_INSENSITIVE_MODS)
@@ -48,6 +49,19 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 			return null;
 		var path = getAssetPath();
 		editedTimes[id] = FileSystem.stat(path).mtime.getTime();
+		if (guarded) {
+			if (!ModGuard.validateAudio(path)) return null;
+			var buffer:AudioBuffer = null;
+			ModGuard.beginLoad(path);
+			try {
+				buffer = AudioBuffer.fromFile(path);
+			} catch (e:Dynamic) {
+				Logs.warn('Failed to load sound "$id": $e');
+				buffer = null;
+			}
+			ModGuard.endLoad();
+			return buffer;
+		}
 		var e = AudioBuffer.fromFile(path);
 		// LimeAssets.cache.audio.set('$libName:$id', e);
 		return e;
@@ -71,9 +85,15 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 		var font:Font = null;
 		try {
 			var bytes = Bytes.fromFile(path);
-			if (bytes != null && bytes.length > 0)
+			if (guarded && !ModGuard.validateFont(path, bytes))
+				return null;
+			if (bytes != null && bytes.length > 0) {
+				ModGuard.beginLoad(path);
 				font = Font.fromBytes(bytes);
+				ModGuard.endLoad();
+			}
 		} catch (e:Dynamic) {
+			ModGuard.endLoad();
 			font = null;
 		}
 		if (font == null)
@@ -92,6 +112,29 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 
 		#if mobile
 		Paths.loadTrace('image file "$path"');
+		if (guarded) {
+			var bytes:Bytes = null;
+			try {
+				bytes = Bytes.fromFile(path);
+			} catch (err:Dynamic) {
+				bytes = null;
+			}
+			if (!ModGuard.validateImage(path, bytes)) return null;
+			var image:Image = null;
+			ModGuard.beginLoad(path);
+			try {
+				image = Image.fromBytes(bytes);
+			} catch (err:Dynamic) {
+				Logs.warn('Failed to load image "$id": $err');
+				image = null;
+			}
+			ModGuard.endLoad();
+			if (image == null || image.width <= 0 || image.height <= 0) {
+				ModGuard.block(path, "image could not be decoded");
+				return null;
+			}
+			return image;
+		}
 		if (!funkin.backend.utils.TextureGuard.canLoad(path, id))
 			return null;
 		var e:Image = null;
@@ -137,7 +180,10 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 
 	public override function exists(asset:String, type:String):Bool {
 		if(!__parseAsset(asset)) return false;
-		return FileSystem.exists(getAssetPath());
+		var path = getAssetPath();
+		if (!FileSystem.exists(path)) return false;
+		if (guarded && ModGuard.isBlocked(path)) return false;
+		return true;
 	}
 
 	private function getAssetPath() {

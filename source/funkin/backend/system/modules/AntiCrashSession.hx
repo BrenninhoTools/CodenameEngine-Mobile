@@ -65,6 +65,16 @@ class AntiCrashSession
 			previousSessionCrashed = true;
 			Logs.trace('[AntiCrash] The previous session closed unexpectedly in "$state" (mod: ${mod == "" ? "(default)" : mod})', WARNING);
 
+			var blamedFile = false;
+			try
+			{
+				blamedFile = FileSystem.exists(funkin.backend.assets.ModGuard.LOADING_FILE)
+					&& File.getContent(funkin.backend.assets.ModGuard.LOADING_FILE).trim().length > 0;
+			}
+			catch (_:Dynamic) {}
+			if (blamedFile)
+				return;
+
 			var strikes = readStrikes();
 			var count = strikes.mod == mod ? strikes.count + 1 : 1;
 			saveStrikes(mod, count);

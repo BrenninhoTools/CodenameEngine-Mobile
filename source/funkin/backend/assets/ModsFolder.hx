@@ -199,6 +199,8 @@ class ModsFolder {
 	public static function prepareModLibrary(libName:String, lib:IModsAssetLibrary, force:Bool = false, ?tag:AssetSource) {
 		var openLib = prepareLibrary(libName, force);
 		lib.prefix = 'assets/';
+		if (tag == MODS && lib is ModsFolderLibrary)
+			cast(lib, ModsFolderLibrary).guarded = true;
 		@:privateAccess
 		openLib.__proxy = cast(lib, lime.utils.AssetLibrary);
 		if (tag != null) {

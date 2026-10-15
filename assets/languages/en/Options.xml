@@ -183,6 +183,8 @@
 		<str id="invisiblePauseButton-desc">If checked, the pause button will be invisible during songs, but you can still tap it to pause.</str>
 		<str id="antiCrash-name">AntiCrash</str>
 		<str id="antiCrash-desc">If checked, errors are caught and the game recovers by disabling broken scripts, closing menus, leaving songs or switching back to the base game instead of crashing.</str>
+		<str id="resetModFiles-name">Re-enable Disabled Mod Files</str>
+		<str id="resetModFiles-desc">Mod files that are broken or closed the game are disabled automatically and the base game files are used instead. Select this to try them again.</str>
 		<str id="storageType-name">Storage Type</str>
 		<str id="storageType-desc">Where the mods, addons and extracted assets are stored. Data uses Android/data, Media uses Android/media, Obb uses Android/obb and External uses a .CodenameEngine folder in the internal storage. Restart the game to apply.</str>
 		<str id="storageType-restart">Restart the game to apply the new Storage Type.</str>
