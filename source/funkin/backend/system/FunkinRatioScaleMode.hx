@@ -17,7 +17,12 @@ class FunkinRatioScaleMode extends RatioScaleMode {
 			scaleY = !scaleY;
 		}
 
-		if (scaleY)
+		if (isFullScreenStyle())
+		{
+			gameSize.x = Width;
+			gameSize.y = Height;
+		}
+		else if (scaleY)
 		{
 			gameSize.x = Width;
 			gameSize.y = Math.floor(gameSize.x / ratio);
@@ -40,6 +45,14 @@ class FunkinRatioScaleMode extends RatioScaleMode {
 			FlxG.width = width;
 			FlxG.height = height;
 		}
+	}
+
+	public static inline function isFullScreenStyle():Bool
+		return #if mobile Options.screenStyle == "Full" #else false #end;
+
+	public static function refresh() {
+		@:privateAccess
+		if (FlxG.game != null) FlxG.game.onResize(null);
 	}
 
 	public function resetSize() {

@@ -40,6 +40,8 @@ class Options
 	public static var autoPause:Bool = true;
 	public static var invisibleHitbox:Bool = false;
 	public static var antiCrash:Bool = true;
+	public static var hitboxOpacity:Float = 25;
+	public static var screenStyle:String = "Original";
 	public static var hitboxMode:String = "Four Lanes";
 	public static var invisiblePauseButton:Bool = false;
 	@:doNotSave public static var storageType:String = "Data";

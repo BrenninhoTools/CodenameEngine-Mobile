@@ -177,6 +177,10 @@
 	<group name="MobileOptions" prefix="MobileOptions.">
 		<str id="invisibleHitbox-name">Invisible Hitbox</str>
 		<str id="invisibleHitbox-desc">If checked, the hitbox lanes will not light up when you touch them.</str>
+		<str id="hitboxOpacity-name">Hitbox Opacity</str>
+		<str id="hitboxOpacity-desc">How visible the hitbox lanes are when you touch them, from 0 to 100.</str>
+		<str id="screenStyle-name">Screen Style</str>
+		<str id="screenStyle-desc">Original keeps the game at 16:9 with black borders. Full stretches the game to fill the whole screen without borders.</str>
 		<str id="hitboxMode-name">Hitbox Mode</str>
 		<str id="hitboxMode-desc">Four Lanes splits the screen into one lane per arrow. Arrows uses your strums as big buttons at the bottom of the screen and hides the opponent's strums and notes.</str>
 		<str id="invisiblePauseButton-name">Invisible Pause Button</str>

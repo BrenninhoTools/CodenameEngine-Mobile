@@ -228,7 +228,7 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 			if (hint == null)
 				continue;
 			if (pressed(i) && !Options.invisibleHitbox && !isArrowsMode())
-				hint.alpha = hintAlpha;
+				hint.alpha = Options.hitboxOpacity / 100;
 			else if (hint.alpha > 0)
 				hint.alpha = Math.max(0, hint.alpha - elapsed * 3);
 		}

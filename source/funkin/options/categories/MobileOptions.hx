@@ -7,6 +7,8 @@ class MobileOptions extends TreeMenuScreen {
 		super('optionsTree.mobile-name', 'optionsTree.mobile-desc', 'MobileOptions.');
 
 		add(new Checkbox(getNameID('invisibleHitbox'), getDescID('invisibleHitbox'), 'invisibleHitbox'));
+		add(new NumOption(getNameID('hitboxOpacity'), getDescID('hitboxOpacity'), 0, 100, 5, 'hitboxOpacity'));
+		add(new ArrayOption(getNameID('screenStyle'), getDescID('screenStyle'), ["Original", "Full"], ["Original", "Full"], 'screenStyle', (_) -> funkin.backend.system.FunkinRatioScaleMode.refresh()));
 		add(new ArrayOption(getNameID('hitboxMode'), getDescID('hitboxMode'), funkin.mobile.Hitbox.MODES, funkin.mobile.Hitbox.MODES, 'hitboxMode'));
 		add(new Checkbox(getNameID('invisiblePauseButton'), getDescID('invisiblePauseButton'), 'invisiblePauseButton'));
 		add(new Checkbox(getNameID('antiCrash'), getDescID('antiCrash'), 'antiCrash'));
