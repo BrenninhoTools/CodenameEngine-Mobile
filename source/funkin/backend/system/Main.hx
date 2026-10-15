@@ -212,10 +212,36 @@ class Main extends Sprite
 			haxe.Timer.delay(refreshScreen, delay);
 	}
 
+	static function syncNativeWindowSize():Bool @:privateAccess {
+		#if lime_cffi
+		var window = lime.app.Application.current != null ? lime.app.Application.current.window : null;
+		if (window == null || window.__backend == null || window.__backend.handle == null) return false;
+		try {
+			var handle = window.__backend.handle;
+			var width:Int = lime._internal.backend.native.NativeCFFI.lime_window_get_width(handle);
+			var height:Int = lime._internal.backend.native.NativeCFFI.lime_window_get_height(handle);
+			var scale:Float = lime._internal.backend.native.NativeCFFI.lime_window_get_scale(handle);
+			if (width <= 0 || height <= 0) return false;
+			var changed = width != window.__width || height != window.__height || (scale > 0 && scale != window.__scale);
+			if (!changed) return false;
+			Logs.trace('[Screen] Window size was ${window.__width}x${window.__height}@${window.__scale}, actual ${width}x${height}@${scale}', WARNING);
+			window.__width = width;
+			window.__height = height;
+			if (scale > 0) window.__scale = scale;
+			window.onResize.dispatch(width, height);
+			return true;
+		} catch (_:Dynamic) {}
+		#end
+		return false;
+	}
+
+	static var screenCheckTimer:Float = 0;
+
 	static function refreshScreen() @:privateAccess {
 		var stage = Lib.current.stage;
 		if (stage == null || stage.window == null) return;
 		try {
+			syncNativeWindowSize();
 			stage.__resize();
 			if (FlxG.game != null) FlxG.game.onResize(null);
 			updateMobileFramerateScale();
@@ -225,6 +251,14 @@ class Main extends Sprite
 	static function checkScreenSize() {
 		var stage = Lib.current.stage;
 		if (stage == null || FlxG.scaleMode == null) return;
+		screenCheckTimer += FlxG.elapsed;
+		if (screenCheckTimer >= 0.5) {
+			screenCheckTimer = 0;
+			if (syncNativeWindowSize()) {
+				refreshScreen();
+				return;
+			}
+		}
 		@:privateAccess
 		var device = FlxG.scaleMode.deviceSize;
 		if (device == null) return;
