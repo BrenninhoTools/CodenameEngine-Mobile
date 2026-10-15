@@ -676,7 +676,7 @@ class AntiCrashNotice extends Sprite
 	{
 		var text = 'AntiCrash: $title';
 		if (detail != null && detail.length > 0)
-			text += "\n" + (detail.length > 200 ? detail.substr(0, 200) + "..." : detail);
+			text += "\n" + (detail.length > 400 ? detail.substr(0, 400) + "..." : detail);
 		field.text = text;
 		var stageWidth = stage != null ? stage.stageWidth : 1280;
 		field.width = Math.min(stageWidth - 20, 760);

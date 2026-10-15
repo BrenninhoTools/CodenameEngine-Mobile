@@ -18,7 +18,7 @@ class StoragePermissionState extends FlxState
 	{
 		super.create();
 
-		infoText = new FlxText(40, 0, FlxG.width - 80, "Found an existing .CodenameEngine folder.\nAllow \"All files access\" to keep using it.", 28);
+		infoText = new FlxText(40, 0, FlxG.width - 80, "Codename Engine keeps its assets and mods in the .CodenameEngine folder.\nAllow \"All files access\" to use it.", 28);
 		infoText.alignment = CENTER;
 		infoText.screenCenter(Y);
 		add(infoText);
@@ -44,7 +44,7 @@ class StoragePermissionState extends FlxState
 		{
 			checkTimer = 0.5;
 			if (StorageUtil.hasStoragePermission())
-				finish(StorageUtil.STORAGE_EXTERNAL);
+				finish(true);
 		}
 	}
 
@@ -55,15 +55,15 @@ class StoragePermissionState extends FlxState
 	{
 		if (done || !leftApp)
 			return;
-		finish(StorageUtil.hasStoragePermission() ? StorageUtil.STORAGE_EXTERNAL : StorageUtil.STORAGE_DATA);
+		finish(StorageUtil.hasStoragePermission());
 	}
 
-	function finish(type:String)
+	function finish(granted:Bool)
 	{
 		if (done)
 			return;
 		done = true;
-		StorageUtil.applyDetectedType(type);
+		StorageUtil.onPermissionResult(granted);
 		if (CopyState.needsCopy())
 			FlxG.switchState(new CopyState());
 		else

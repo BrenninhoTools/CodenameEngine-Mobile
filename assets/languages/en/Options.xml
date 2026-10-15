@@ -187,6 +187,10 @@
 		<str id="invisiblePauseButton-desc">If checked, the pause button will be invisible during songs, but you can still tap it to pause.</str>
 		<str id="antiCrash-name">AntiCrash</str>
 		<str id="antiCrash-desc">If checked, errors are caught and the game recovers by disabling broken scripts, closing menus, leaving songs or switching back to the base game instead of crashing.</str>
+		<str id="storageInfo-name">Storage Info</str>
+		<str id="storageInfo-desc">Shows where the game is storing its files, the free space and how many mods and addons are installed.</str>
+		<str id="reextractAssets-name">Re-extract Assets</str>
+		<str id="reextractAssets-desc">Copies all the engine assets again on the next start, replacing the ones in the storage folder. Mods are not touched.</str>
 		<str id="resetModFiles-name">Re-enable Disabled Mod Files</str>
 		<str id="resetModFiles-desc">Mod files that are broken or closed the game are disabled automatically and the base game files are used instead. Select this to try them again.</str>
 		<str id="storageType-name">Storage Type</str>

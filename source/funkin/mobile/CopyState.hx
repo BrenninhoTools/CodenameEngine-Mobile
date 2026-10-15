@@ -116,6 +116,17 @@ class CopyState extends FlxState
 		#end
 	}
 
+	static function writeVersion()
+	{
+		#if sys
+		try
+		{
+			File.saveContent(StorageUtil.storageDirectory + VERSION_FILE, getVersionKey());
+		}
+		catch (e:Dynamic) {}
+		#end
+	}
+
 	static function missing(relative:String):Bool
 	{
 		#if sys
@@ -135,10 +146,19 @@ class CopyState extends FlxState
 	public static function needsCopy():Bool
 	{
 		#if (sys && mobile)
-		if (isVersionOutdated() || StorageUtil.getPreviousDirectory() != null)
+		if (StorageUtil.isReextractRequested())
 			return true;
+		if (!StorageUtil.hasExtractedAssets())
+		{
+			Logs.trace('[CopyState] No assets found in ${StorageUtil.storageDirectory}, extracting', INFO);
+			return true;
+		}
+		if (StorageUtil.getPreviousDirectory() != null)
+			return true;
+
 		var files = getFilesToCopy();
-		var step = Std.int(Math.max(1, files.length / 40));
+		var outdated = isVersionOutdated();
+		var step = outdated ? 1 : Std.int(Math.max(1, files.length / 40));
 		var i = 0;
 		while (i < files.length)
 		{
@@ -147,6 +167,9 @@ class CopyState extends FlxState
 				return true;
 			i += step;
 		}
+		if (outdated)
+			writeVersion();
+		Logs.trace('[CopyState] Assets already present in ${StorageUtil.storageDirectory}, skipping extraction', INFO);
 		StorageUtil.saveCurrentDirectory();
 		#end
 		return false;
@@ -158,8 +181,7 @@ class CopyState extends FlxState
 
 		#if (sys && mobile)
 		var root = StorageUtil.storageDirectory;
-		var hasVersion = FileSystem.exists(root + VERSION_FILE);
-		overwrite = hasVersion && isVersionOutdated();
+		overwrite = StorageUtil.isReextractRequested();
 
 		for (id in getFilesToCopy())
 			if (overwrite || missing(id))
@@ -282,11 +304,8 @@ class CopyState extends FlxState
 
 		if (!assetsFailed)
 		{
-			try
-			{
-				File.saveContent(root + VERSION_FILE, getVersionKey());
-			}
-			catch (e:Dynamic) {}
+			writeVersion();
+			StorageUtil.clearReextract();
 		}
 
 		StorageUtil.saveCurrentDirectory();

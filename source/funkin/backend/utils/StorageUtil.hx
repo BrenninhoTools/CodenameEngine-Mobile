@@ -28,6 +28,9 @@ class StorageUtil
 
 	static final STORAGE_TYPE_FILE:String = "storage_type.txt";
 	static final STORAGE_PATH_FILE:String = "storage_path.txt";
+	static final REEXTRACT_FILE:String = "reextract.txt";
+	public static final CRASH_FOLDER:String = "crash";
+	public static final NO_MEDIA_FILE:String = ".nomedia";
 	static final WRITE_TEST_FILE:String = ".write_test";
 	static final COPY_BUFFER_SIZE:Int = 65536;
 
@@ -195,25 +198,40 @@ class StorageUtil
 	{
 		#if android
 		if (hasStorageTypeSetting())
-			return true;
-
-		if (hasStoragePermission() && hasExtractedAssets(getExternalFolder()))
-			return applyDetectedType(STORAGE_EXTERNAL);
-
-		for (type in [STORAGE_DATA, STORAGE_MEDIA, STORAGE_OBB])
 		{
-			var path = getDirectoryForType(type);
-			if (path != null && hasExtractedAssets(path))
-				return applyDetectedType(type);
+			if (getStorageType() == STORAGE_EXTERNAL && !hasStoragePermission())
+				return false;
+			return true;
 		}
 
-		if (externalFolderExists() && !hasStoragePermission())
-			return false;
+		if (hasStoragePermission())
+			return applyDetectedType(STORAGE_EXTERNAL);
 
-		return applyDetectedType(externalFolderExists() ? STORAGE_EXTERNAL : STORAGE_DATA);
+		if (!externalFolderExists())
+		{
+			for (type in [STORAGE_DATA, STORAGE_MEDIA, STORAGE_OBB])
+			{
+				var path = getDirectoryForType(type);
+				if (path != null && hasExtractedAssets(path))
+					return applyDetectedType(type);
+			}
+		}
+
+		return false;
 		#else
 		return true;
 		#end
+	}
+
+	public static function onPermissionResult(granted:Bool)
+	{
+		if (granted)
+			applyDetectedType(STORAGE_EXTERNAL);
+		else
+		{
+			Logs.trace('[StorageUtil] Storage permission denied, using Data instead', WARNING);
+			applyDetectedType(STORAGE_DATA);
+		}
 	}
 
 	public static function applyDetectedType(type:String):Bool
@@ -231,7 +249,12 @@ class StorageUtil
 			path = storageDirectory;
 		try
 		{
-			return path != null && FileSystem.exists(Path.addTrailingSlash(path) + ASSETS_FOLDER + "/.version");
+			if (path == null)
+				return false;
+			var assets = Path.addTrailingSlash(path) + ASSETS_FOLDER + "/";
+			if (FileSystem.exists(assets + ".version"))
+				return true;
+			return FileSystem.exists(assets + "images") && FileSystem.exists(assets + "data") && FileSystem.exists(assets + "music");
 		}
 		catch (e:Dynamic) {}
 		#end
@@ -271,7 +294,131 @@ class StorageUtil
 		Sys.setCwd(path);
 		for (folder in USER_FOLDERS)
 			createDirectory(path + folder);
+		createDirectory(path + LOGS_FOLDER);
+		createDirectory(path + CRASH_FOLDER);
+		if (activeStorageType == STORAGE_EXTERNAL || activeStorageType == STORAGE_MEDIA)
+			ensureNoMedia(path);
 		#end
+	}
+
+	static function ensureNoMedia(path:String)
+	{
+		#if sys
+		try
+		{
+			var file = path + NO_MEDIA_FILE;
+			if (!FileSystem.exists(file))
+				File.saveContent(file, "");
+		}
+		catch (e:Dynamic) {}
+		#end
+	}
+
+	public static function requestReextract()
+		writeSetting(REEXTRACT_FILE, "1");
+
+	public static function isReextractRequested():Bool
+		return readSetting(REEXTRACT_FILE) == "1";
+
+	public static function clearReextract()
+	{
+		#if sys
+		try
+		{
+			var path = getSettingsDirectory() + REEXTRACT_FILE;
+			if (FileSystem.exists(path))
+				FileSystem.deleteFile(path);
+		}
+		catch (e:Dynamic) {}
+		#end
+	}
+
+	public static function getDirectorySize(path:String):Float
+	{
+		var total:Float = 0;
+		#if sys
+		try
+		{
+			if (!FileSystem.exists(path))
+				return 0;
+			if (!FileSystem.isDirectory(path))
+				return FileSystem.stat(path).size;
+			for (entry in FileSystem.readDirectory(path))
+				total += getDirectorySize(Path.addTrailingSlash(path) + entry);
+		}
+		catch (e:Dynamic) {}
+		#end
+		return total;
+	}
+
+	public static function deleteDirectory(path:String):Bool
+	{
+		#if sys
+		try
+		{
+			if (!FileSystem.exists(path))
+				return true;
+			if (!FileSystem.isDirectory(path))
+			{
+				FileSystem.deleteFile(path);
+				return true;
+			}
+			for (entry in FileSystem.readDirectory(path))
+				deleteDirectory(Path.addTrailingSlash(path) + entry);
+			FileSystem.deleteDirectory(path);
+			return true;
+		}
+		catch (e:Dynamic)
+		{
+			lastError = Std.string(e);
+		}
+		#end
+		return false;
+	}
+
+	public static function countFolders(path:String):Int
+	{
+		#if sys
+		try
+		{
+			if (!FileSystem.exists(path))
+				return 0;
+			var count = 0;
+			for (entry in FileSystem.readDirectory(path))
+				if (FileSystem.isDirectory(Path.addTrailingSlash(path) + entry))
+					count++;
+			return count;
+		}
+		catch (e:Dynamic) {}
+		#end
+		return 0;
+	}
+
+	public static function formatSize(bytes:Float):String
+	{
+		if (bytes < 0)
+			return "unknown";
+		var units = ["B", "KB", "MB", "GB", "TB"];
+		var unit = 0;
+		while (bytes >= 1024 && unit < units.length - 1)
+		{
+			bytes /= 1024;
+			unit++;
+		}
+		return (Math.round(bytes * 10) / 10) + " " + units[unit];
+	}
+
+	public static function getStorageInfo():String
+	{
+		var lines = [
+			'Storage: ${activeStorageType}',
+			'Path: ${storageDirectory}',
+			'Free space: ${formatSize(getFreeSpace())}',
+			'Mods: ${countFolders(getModsPath())}',
+			'Addons: ${countFolders(getAddonsPath())}',
+			'Assets extracted: ${hasExtractedAssets() ? "yes" : "no"}'
+		];
+		return lines.join("\n");
 	}
 
 	public static function getPreviousDirectory():String

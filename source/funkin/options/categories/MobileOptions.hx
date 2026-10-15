@@ -12,6 +12,13 @@ class MobileOptions extends TreeMenuScreen {
 		add(new ArrayOption(getNameID('hitboxMode'), getDescID('hitboxMode'), funkin.mobile.Hitbox.MODES, funkin.mobile.Hitbox.MODES, 'hitboxMode'));
 		add(new Checkbox(getNameID('invisiblePauseButton'), getDescID('invisiblePauseButton'), 'invisiblePauseButton'));
 		add(new Checkbox(getNameID('antiCrash'), getDescID('antiCrash'), 'antiCrash'));
+		add(new TextOption(getNameID('storageInfo'), getDescID('storageInfo'), () -> {
+			funkin.backend.system.modules.AntiCrash.showNotice('Storage', StorageUtil.getStorageInfo());
+		}));
+		add(new TextOption(getNameID('reextractAssets'), getDescID('reextractAssets'), () -> {
+			StorageUtil.requestReextract();
+			funkin.backend.system.modules.AntiCrash.showNotice('Assets will be extracted again', 'Restart the game to apply.');
+		}));
 		add(new TextOption(getNameID('resetModFiles'), getDescID('resetModFiles'), () -> {
 			var count = funkin.backend.assets.ModGuard.getBlocked().length;
 			funkin.backend.assets.ModGuard.clearBlocked();
