@@ -147,6 +147,7 @@ class Main extends Sprite
 		funkin.options.PlayerSettings.init();
 		Options.load();
 		funkin.backend.system.modules.AntiCrash.init();
+		funkin.backend.utils.ScreenUtil.init();
 
 		game.focusLostFramerate = 30;
 		FlxG.fixedTimestep = false;

@@ -53,6 +53,12 @@ class TitleState extends MusicBeatState
 		titleScreenSprites = new MusicBeatGroup();
 		add(titleScreenSprites);
 		loadXML();
+		#if mobile
+		if (funkin.backend.utils.ScreenUtil.isFull) {
+			funkin.backend.utils.ScreenUtil.centerLayout(titleScreenSprites);
+			if (titleText != null) funkin.backend.utils.ScreenUtil.centerLayout(titleText);
+		}
+		#end
 
 		if (titleText == null) {
 			titleText = new FlxSprite(0, FlxG.height * 0.8);

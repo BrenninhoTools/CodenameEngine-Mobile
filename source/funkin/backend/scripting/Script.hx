@@ -141,6 +141,7 @@ class Script extends FlxBasic implements IFlxDestroyable
 			"Hitbox" => funkin.mobile.Hitbox,
 			"AntiCrash" => funkin.backend.system.modules.AntiCrash,
 			"isMobile" => #if mobile true #else false #end,
+			"ScreenUtil" => funkin.backend.utils.ScreenUtil,
 
 			"CoolUtil" => funkin.backend.utils.CoolUtil,
 			"IniUtil" => funkin.backend.utils.IniUtil,
