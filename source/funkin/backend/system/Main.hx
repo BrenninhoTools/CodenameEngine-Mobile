@@ -187,7 +187,12 @@ class Main extends Sprite
 		updateMobileFramerateScale();
 		Lib.current.stage.addEventListener(openfl.events.Event.RESIZE, (_) -> updateMobileFramerateScale());
 		Lib.current.stage.addEventListener(openfl.events.MouseEvent.MOUSE_DOWN, (_) -> recoverFocus());
-		Lib.current.stage.addEventListener(openfl.events.Event.ACTIVATE, (_) -> recoverFocus());
+		Lib.current.stage.addEventListener(openfl.events.Event.ACTIVATE, (_) -> {
+			recoverFocus();
+			scheduleScreenRefresh();
+		});
+		FlxG.signals.focusGained.add(scheduleScreenRefresh);
+		FlxG.signals.postUpdate.add(checkScreenSize);
 		framerateSprite.addEventListener(openfl.events.MouseEvent.CLICK, (_) -> {
 			if (Options.fpsCounter)
 				Framerate.debugMode = Framerate.debugMode == 1 ? 2 : 1;
@@ -199,6 +204,32 @@ class Main extends Sprite
 		Framerate.offset.x = 24;
 		var scale = Math.max(0.75, Math.min(Lib.current.stage.stageWidth / 1280, Lib.current.stage.stageHeight / 720) * 0.9);
 		framerateSprite.scaleX = framerateSprite.scaleY = scale;
+	}
+
+	static function scheduleScreenRefresh() {
+		refreshScreen();
+		for (delay in [100, 300, 800, 1500])
+			haxe.Timer.delay(refreshScreen, delay);
+	}
+
+	static function refreshScreen() @:privateAccess {
+		var stage = Lib.current.stage;
+		if (stage == null || stage.window == null) return;
+		try {
+			stage.__resize();
+			if (FlxG.game != null) FlxG.game.onResize(null);
+			updateMobileFramerateScale();
+		} catch (_:Dynamic) {}
+	}
+
+	static function checkScreenSize() {
+		var stage = Lib.current.stage;
+		if (stage == null || FlxG.scaleMode == null) return;
+		@:privateAccess
+		var device = FlxG.scaleMode.deviceSize;
+		if (device == null) return;
+		if (Std.int(device.x) != stage.stageWidth || Std.int(device.y) != stage.stageHeight)
+			refreshScreen();
 	}
 
 	static function recoverFocus() @:privateAccess {
