@@ -17,8 +17,15 @@ class FunkinRatioScaleMode extends RatioScaleMode {
 			scaleY = !scaleY;
 		}
 
-		if (isFullScreenStyle())
+		var targetWidth:Int = width;
+		var targetHeight:Int = height;
+
+		if (isFullScreenStyle() && Width > 0 && Height > 0)
 		{
+			if (realRatio >= ratio)
+				targetWidth = Math.round(height * realRatio);
+			else
+				targetHeight = Math.round(width / realRatio);
 			gameSize.x = Width;
 			gameSize.y = Height;
 		}
@@ -37,13 +44,13 @@ class FunkinRatioScaleMode extends RatioScaleMode {
 
 			for(c in FlxG.cameras.list) {
 				if (c.width == FlxG.width && c.height == FlxG.height) {
-					c.width = width;
-					c.height = height;
+					c.width = targetWidth;
+					c.height = targetHeight;
 				}
 			}
 
-			FlxG.width = width;
-			FlxG.height = height;
+			FlxG.width = targetWidth;
+			FlxG.height = targetHeight;
 		}
 	}
 
