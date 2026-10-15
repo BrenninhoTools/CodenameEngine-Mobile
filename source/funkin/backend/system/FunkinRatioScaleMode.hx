@@ -6,6 +6,35 @@ class FunkinRatioScaleMode extends RatioScaleMode {
 	@:isVar public var width(get, set):Null<Int> = null;
 	@:isVar public var height(get, set):Null<Int> = null;
 
+	override public function onMeasure(Width:Int, Height:Int):Void
+	{
+		if (isFullScreenStyle() && Width > 0 && Height > 0)
+		{
+			var targetWidth:Int = width;
+			var targetHeight:Int = height;
+			if (Width / Height >= width / height)
+				targetWidth = Math.round(height * Width / Height);
+			else
+				targetHeight = Math.round(width * Height / Width);
+
+			@:privateAccess {
+				FlxG.width = targetWidth;
+				FlxG.height = targetHeight;
+			}
+			for (camera in FlxG.cameras.list)
+			{
+				camera.width = targetWidth;
+				camera.height = targetHeight;
+			}
+			gameSize.set(Width, Height);
+			updateDeviceSize(Width, Height);
+			updateScaleOffset();
+			updateGamePosition();
+			return;
+		}
+		super.onMeasure(Width, Height);
+	}
+
 	public override function updateGameSize(Width:Int, Height:Int):Void
 	{
 		var ratio:Float = width / height;
@@ -20,16 +49,7 @@ class FunkinRatioScaleMode extends RatioScaleMode {
 		var targetWidth:Int = width;
 		var targetHeight:Int = height;
 
-		if (isFullScreenStyle() && Width > 0 && Height > 0)
-		{
-			if (realRatio >= ratio)
-				targetWidth = Math.round(height * realRatio);
-			else
-				targetHeight = Math.round(width / realRatio);
-			gameSize.x = Width;
-			gameSize.y = Height;
-		}
-		else if (scaleY)
+		if (scaleY)
 		{
 			gameSize.x = Width;
 			gameSize.y = Math.floor(gameSize.x / ratio);
