@@ -82,6 +82,9 @@ class EditorPicker extends MusicBeatSubstate {
 			sprites.push(spr);
 		}
 		sprites[0].selected = true;
+		#if mobile
+		addBackButton();
+		#end
 
 		FlxG.mouse.getScreenPosition(subCam, oldMousePos);
 	}
@@ -105,7 +108,7 @@ class EditorPicker extends MusicBeatSubstate {
 			changeSelection(Std.int(curMousePos.y / optionHeight)+1);
 		}
 
-		if (controls.ACCEPT || FlxG.mouse.justReleased) {
+		if (controls.ACCEPT || (FlxG.mouse.justReleased #if mobile && !funkin.mobile.MobileButton.isBlocking() #end)) {
 			if(options[curSelected].onClick != null)
 				options[curSelected].onClick();
 			else if (options[curSelected].state != null) {

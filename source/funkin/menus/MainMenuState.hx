@@ -33,6 +33,9 @@ class MainMenuState extends MusicBeatState
 	#if (mobile && MOD_SUPPORT)
 	var modsButton:MobileButton;
 	#end
+	#if mobile
+	var editorButton:MobileButton;
+	#end
 
 	public var canAccessDebugMenus:Bool = !Flags.DISABLE_EDITORS;
 
@@ -108,6 +111,11 @@ class MainMenuState extends MusicBeatState
 
 		addBackButton();
 
+		#if mobile
+		if (canAccessDebugMenus)
+			add(editorButton = MobileButton.createEditor(createMobileCamera()));
+		#end
+
 		#if (mobile && MOD_SUPPORT)
 		add(modsButton = MobileButton.createMods(createMobileCamera()));
 		versionText.x = modsButton.x + modsButton.width + 10;
@@ -125,6 +133,21 @@ class MainMenuState extends MusicBeatState
 
 		if (!selectedSomethin)
 		{
+			#if mobile
+			if (editorButton != null && editorButton.justPressed) {
+				if (Options.devMode) {
+					persistentUpdate = false;
+					persistentDraw = true;
+					openSubState(new funkin.editors.EditorPicker());
+				} else {
+					FlxG.sound.play(Paths.sound(Flags.DEFAULT_EDITOR_DELETE_SOUND));
+					FlxTween.completeTweensOf(devModeWarning);
+					devModeWarning.alpha = 1;
+					FlxTween.color(devModeWarning, 0.2, 0xFFFF0000, 0xFFFFFFFF);
+					FlxTween.shake(devModeWarning, 0.005, 0.3);
+				}
+			}
+			#end
 			if (canAccessDebugMenus) {
 				if (controls.DEV_ACCESS) {
 					persistentUpdate = false;
@@ -172,7 +195,7 @@ class MainMenuState extends MusicBeatState
 			if (controls.ACCEPT)
 				selectItem();
 
-			if (TouchUtil.tapped && menuItems != null && !selectedSomethin) {
+			if (TouchUtil.tapped && menuItems != null && !selectedSomethin && !MobileButton.isBlocking()) {
 				for (index => sprite in menuItems.members) {
 					if (TouchUtil.overlaps(sprite)) {
 						if (curSelected != index) changeItem(index - curSelected);

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextureAtlas imagePath="editorPad.png">
+	<SubTexture name="up0000" x="0" y="0" width="120" height="120"/>
+	<SubTexture name="down0000" x="120" y="0" width="120" height="120"/>
+	<SubTexture name="left0000" x="240" y="0" width="120" height="120"/>
+	<SubTexture name="right0000" x="360" y="0" width="120" height="120"/>
+	<SubTexture name="space0000" x="480" y="0" width="120" height="120"/>
+	<SubTexture name="enter0000" x="0" y="120" width="120" height="120"/>
+	<SubTexture name="escape0000" x="120" y="120" width="120" height="120"/>
+	<SubTexture name="delete0000" x="240" y="120" width="120" height="120"/>
+	<SubTexture name="control0000" x="360" y="120" width="120" height="120"/>
+	<SubTexture name="shift0000" x="480" y="120" width="120" height="120"/>
+	<SubTexture name="undo0000" x="0" y="240" width="120" height="120"/>
+	<SubTexture name="redo0000" x="120" y="240" width="120" height="120"/>
+	<SubTexture name="scrollup0000" x="240" y="240" width="120" height="120"/>
+	<SubTexture name="scrolldown0000" x="360" y="240" width="120" height="120"/>
+	<SubTexture name="toggle0000" x="480" y="240" width="120" height="120"/>
+</TextureAtlas>

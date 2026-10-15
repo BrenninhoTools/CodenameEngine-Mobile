@@ -50,6 +50,17 @@ class UIState extends MusicBeatState {
 		FlxG.stage.window.onTextEdit.add(onTextEdit);
 	}
 
+	#if mobile
+	public var editorPad:funkin.mobile.EditorVirtualPad;
+
+	public override function createPost() {
+		super.createPost();
+		var className = Type.getClassName(Type.getClass(this));
+		if (className.startsWith("funkin.editors.") && !(this is funkin.options.TreeMenu) && !(this is funkin.editors.ModConfigWarning))
+			add(editorPad = new funkin.mobile.EditorVirtualPad());
+	}
+	#end
+
 	private function onKeyDown(e:KeyCode, modifier:KeyModifier) {
 		if (currentFocus != null)
 			currentFocus.onKeyDown(e, modifier);

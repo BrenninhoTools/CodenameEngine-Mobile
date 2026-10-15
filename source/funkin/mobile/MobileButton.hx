@@ -16,6 +16,10 @@ class MobileButton extends FlxSprite
 
 	public var justPressed(get, never):Bool;
 
+	var isStatic:Bool = false;
+	var baseScale:Float = 1;
+	var pressTimer:Float = 0;
+
 	var lastCheckedFrame:Int = -1;
 	var lastResult:Bool = false;
 
@@ -33,11 +37,20 @@ class MobileButton extends FlxSprite
 		}
 
 		this.animPrefix = animPrefix;
-		frames = Paths.getFrames(image);
-		animation.addByIndices('idle', animPrefix, [0], "", 24, false);
-		animation.addByPrefix('press', animPrefix, 24, false);
-		animation.play('idle');
-		animation.onFinish.add(onAnimationFinish);
+		baseScale = scale;
+		if (openfl.utils.Assets.exists(Paths.file('images/$image.xml')))
+		{
+			frames = Paths.getFrames(image);
+			animation.addByIndices('idle', animPrefix, [0], "", 24, false);
+			animation.addByPrefix('press', animPrefix, 24, false);
+			animation.play('idle');
+			animation.onFinish.add(onAnimationFinish);
+		}
+		else
+		{
+			isStatic = true;
+			loadGraphic(Paths.image(image));
+		}
 
 		this.scale.set(scale, scale);
 		updateHitbox();
@@ -62,6 +75,16 @@ class MobileButton extends FlxSprite
 		var button = new MobileButton(0, 0, 'mobile/modsButton', 'mods', 0.65);
 		button.x = 10;
 		button.y = FlxG.height - button.height - 10;
+		if (camera != null)
+			button.cameras = [camera];
+		return button;
+	}
+
+	public static function createEditor(?camera:FlxCamera):MobileButton
+	{
+		var button = new MobileButton(0, 0, 'mobile/editorButton', 'editor', 0.8);
+		button.x = 10;
+		button.y = 10;
 		if (camera != null)
 			button.cameras = [camera];
 		return button;
@@ -127,9 +150,20 @@ class MobileButton extends FlxSprite
 
 		if (justPressed)
 		{
-			animation.play('press', true);
+			if (isStatic)
+				pressTimer = 0.15;
+			else
+				animation.play('press', true);
 			if (onPress != null)
 				onPress();
+		}
+
+		if (isStatic)
+		{
+			if (pressTimer > 0)
+				pressTimer -= elapsed;
+			var target = pressTimer > 0 ? baseScale * 0.9 : baseScale;
+			scale.x = scale.y = scale.x + (target - scale.x) * Math.min(1, elapsed * 20);
 		}
 	}
 
