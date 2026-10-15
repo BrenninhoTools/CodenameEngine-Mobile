@@ -81,6 +81,8 @@ class ModGuard
 				if (parts.length < 3)
 					continue;
 				var size = Std.parseFloat(parts[1]);
+				if (parts[2].startsWith("empty or unreadable"))
+					continue;
 				blocked.set(key(parts[0]), {path: parts[0], size: Math.isNaN(size) ? -1 : size, reason: parts.slice(2).join("\t")});
 			}
 		}
@@ -265,8 +267,10 @@ class ModGuard
 
 	public static function validateImage(path:String, bytes:Bytes):Bool
 	{
-		if (bytes == null || bytes.length < 8)
-			return reject(path, "empty or unreadable image");
+		if (bytes == null)
+			return false;
+		if (bytes.length < 8)
+			return reject(path, "image file is too small to be valid");
 
 		var size:{width:Int, height:Int} = null;
 		if (isPng(bytes))
@@ -408,8 +412,10 @@ class ModGuard
 
 	public static function validateAudioBytes(path:String, header:Bytes):Bool
 	{
-		if (header == null || header.length < 12)
-			return reject(path, "empty or unreadable sound");
+		if (header == null)
+			return true;
+		if (header.length < 12)
+			return reject(path, "sound file is too small to be valid");
 		var ext = haxe.io.Path.extension(path).toLowerCase();
 
 		if (startsWith(header, "OggS"))
@@ -431,8 +437,10 @@ class ModGuard
 
 	public static function validateFont(path:String, bytes:Bytes):Bool
 	{
-		if (bytes == null || bytes.length < 12)
-			return reject(path, "empty or unreadable font");
+		if (bytes == null)
+			return false;
+		if (bytes.length < 12)
+			return reject(path, "font file is too small to be valid");
 		var tag = bytes.getString(0, 4);
 		if (bytes.get(0) == 0 && bytes.get(1) == 1 && bytes.get(2) == 0 && bytes.get(3) == 0)
 			return true;

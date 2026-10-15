@@ -25,11 +25,35 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 		#if (MOD_SUPPORT && CASE_INSENSITIVE_MODS)
 		clearCaseCache();
 		#end
-		this.basePath = basePath;
+		this.basePath = resolveBasePath(basePath);
 		this.libName = libName;
 		this.prefix = 'assets/$libName/';
 		this.modName = modName == null ? libName : modName;
 		super();
+	}
+
+	static function resolveBasePath(path:String):String {
+		#if (mobile && sys)
+		if (path != null && !path.startsWith("/")) {
+			var cwd = haxe.io.Path.addTrailingSlash(Sys.getCwd());
+			if (path.startsWith("./")) path = path.substr(2);
+			path = haxe.io.Path.removeTrailingSlashes(cwd + path);
+		}
+		#end
+		return path;
+	}
+
+	static function readFileBytes(path:String):Bytes {
+		#if sys
+		try {
+			var data = sys.io.File.getBytes(path);
+			return data == null || data.length == 0 ? null : Bytes.fromBytes(data);
+		} catch (e:Dynamic) {
+			return null;
+		}
+		#else
+		return Bytes.fromFile(path);
+		#end
 	}
 
 	function toString():String {
@@ -72,7 +96,7 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 			return null;
 		var path = getAssetPath();
 		editedTimes[id] = FileSystem.stat(path).mtime.getTime();
-		var e = Bytes.fromFile(path);
+		var e = readFileBytes(path);
 		return e;
 	}
 
@@ -84,7 +108,7 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 		#if mobile
 		var font:Font = null;
 		try {
-			var bytes = Bytes.fromFile(path);
+			var bytes = readFileBytes(path);
 			if (guarded && !ModGuard.validateFont(path, bytes))
 				return null;
 			if (bytes != null && bytes.length > 0) {
@@ -115,7 +139,7 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 		if (guarded) {
 			var bytes:Bytes = null;
 			try {
-				bytes = Bytes.fromFile(path);
+				bytes = readFileBytes(path);
 			} catch (err:Dynamic) {
 				bytes = null;
 			}
