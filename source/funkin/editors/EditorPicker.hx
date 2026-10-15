@@ -84,6 +84,7 @@ class EditorPicker extends MusicBeatSubstate {
 		sprites[0].selected = true;
 		#if mobile
 		addBackButton();
+		funkin.mobile.DoubleTapConfirm.enable();
 		#end
 
 		FlxG.mouse.getScreenPosition(subCam, oldMousePos);
@@ -138,6 +139,9 @@ class EditorPicker extends MusicBeatSubstate {
 	}
 
 	override function destroy() {
+		#if mobile
+		funkin.mobile.DoubleTapConfirm.disable();
+		#end
 		super.destroy();
 
 		oldMousePos.put();

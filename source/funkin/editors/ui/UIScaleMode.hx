@@ -4,6 +4,29 @@ import flixel.system.scaleModes.StageSizeScaleMode;
 
 class UIScaleMode extends StageSizeScaleMode {
 	override public function onMeasure(Width:Int, Height:Int):Void {
+		#if mobile
+		if (Width > 0 && Height > 0) {
+			var logicalWidth = FlxG.initialWidth;
+			var logicalHeight = FlxG.initialHeight;
+			if (Width / Height >= FlxG.initialWidth / FlxG.initialHeight)
+				logicalWidth = Math.round(logicalHeight * Width / Height);
+			else
+				logicalHeight = Math.round(logicalWidth * Height / Width);
+			@:privateAccess {
+				FlxG.width = logicalWidth;
+				FlxG.height = logicalHeight;
+			}
+			for (camera in FlxG.cameras.list) {
+				camera.width = logicalWidth;
+				camera.height = logicalHeight;
+			}
+			gameSize.set(Width, Height);
+			updateDeviceSize(Width, Height);
+			updateScaleOffset();
+			updateGamePosition();
+			return;
+		}
+		#end
 		if ((Width < FlxG.initialWidth || Height < FlxG.initialHeight) && !Options.bypassEditorsResize) {
 			@:privateAccess {
 				FlxG.width = FlxG.initialWidth;

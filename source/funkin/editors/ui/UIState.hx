@@ -57,8 +57,14 @@ class UIState extends MusicBeatState {
 		super.createPost();
 		var className = Type.getClassName(Type.getClass(this));
 		if (className.startsWith("funkin.editors.") && !(this is funkin.options.TreeMenu) && !(this is funkin.editors.ModConfigWarning))
+		{
 			add(editorPad = new funkin.mobile.EditorVirtualPad());
+			funkin.mobile.DoubleTapConfirm.enable();
+			doubleTapEnabled = true;
+		}
 	}
+
+	var doubleTapEnabled:Bool = false;
 	#end
 
 	private function onKeyDown(e:KeyCode, modifier:KeyModifier) {
@@ -136,6 +142,12 @@ class UIState extends MusicBeatState {
 	}
 
 	public override function destroy() {
+		#if mobile
+		if (doubleTapEnabled) {
+			doubleTapEnabled = false;
+			funkin.mobile.DoubleTapConfirm.disable();
+		}
+		#end
 		if (resolutionAware) {
 			resolutionAware = false;
 

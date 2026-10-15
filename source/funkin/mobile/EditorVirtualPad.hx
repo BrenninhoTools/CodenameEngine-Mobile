@@ -26,10 +26,10 @@ class EditorVirtualPad extends FlxTypedGroup<FlxSprite>
 	public static var instance:EditorVirtualPad;
 	public static var hidden:Bool = false;
 
-	public static inline var BUTTON_SCALE:Float = 0.7;
+	public static inline var BUTTON_SCALE:Float = 0.66;
 	public static inline var MARGIN:Float = 10;
 	public static inline var GAP:Float = 6;
-	public static inline var IDLE_ALPHA:Float = 0.55;
+	public static inline var IDLE_ALPHA:Float = 0.8;
 	public static inline var WHEEL_REPEAT:Float = 0.08;
 
 	public var padCamera:FlxCamera;
@@ -76,7 +76,8 @@ class EditorVirtualPad extends FlxTypedGroup<FlxSprite>
 	{
 		var sprite = new FlxSprite();
 		sprite.frames = Paths.getFrames('mobile/editorPad');
-		sprite.animation.addByPrefix('idle', name, 0, false);
+		sprite.animation.addByPrefix('idle', '$name idle', 0, false);
+		sprite.animation.addByPrefix('press', '$name press', 0, false);
 		sprite.animation.play('idle');
 		sprite.scale.set(BUTTON_SCALE, BUTTON_SCALE);
 		sprite.updateHitbox();
@@ -182,8 +183,12 @@ class EditorVirtualPad extends FlxTypedGroup<FlxSprite>
 				}
 			}
 
-			button.sprite.alpha = button.pressed || button.latched ? 1 : IDLE_ALPHA;
-			button.sprite.color = button.latched ? 0xFF8FB4FF : 0xFFFFFFFF;
+			var down = button.pressed || button.latched;
+			var anim = down ? 'press' : 'idle';
+			if (button.sprite.animation.name != anim)
+				button.sprite.animation.play(anim);
+			button.sprite.alpha = down ? 1 : IDLE_ALPHA;
+			button.sprite.color = button.latched ? 0xFFA8C8FF : 0xFFFFFFFF;
 		}
 
 		if (pendingWheel != 0)
