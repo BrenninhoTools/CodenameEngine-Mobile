@@ -211,6 +211,7 @@ class FreeplayState extends MusicBeatState
 			lerpScore = intendedScore;
 
 		var selectedAnotherSong:Bool = false;
+		var tappedSelectedSong:Bool = false;
 		if (canSelect) {
 			changeSelection((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - FlxG.mouse.wheel + TouchUtil.verticalScroll);
 			changeDiff((controls.LEFT_P ? -1 : 0) + (controls.RIGHT_P ? 1 : 0) + (TouchUtil.swipeLeft ? -1 : 0) + (TouchUtil.swipeRight ? 1 : 0));
@@ -222,13 +223,12 @@ class FreeplayState extends MusicBeatState
 				selectedAnotherSong = true;
 			}
 
-			if (TouchUtil.tapped && grpSongs != null && !selectedAnotherSong) {
-				for (index => sprite in grpSongs.members) {
-					if (curSelected != index && TouchUtil.overlaps(sprite)) {
-						changeSelection(index - curSelected);
-						selectedAnotherSong = true;
-						break;
-					}
+			if (grpSongs != null && !selectedAnotherSong && !TouchUtil.overlaps(scoreBG)) {
+				var index = TouchUtil.tappedRow(grpSongs.members, null, 12);
+				if (index >= 0) {
+					if (index == curSelected) tappedSelectedSong = true;
+					else changeSelection(index - curSelected);
+					selectedAnotherSong = index != curSelected || tappedSelectedSong;
 				}
 			}
 
@@ -257,8 +257,7 @@ class FreeplayState extends MusicBeatState
 			convertChart();
 		#end
 
-		if ((controls.ACCEPT || (canSelect && !selectedAnotherSong && grpSongs?.members[curSelected] != null
-			&& TouchUtil.tappedOn(grpSongs.members[curSelected]))))
+		if (controls.ACCEPT || (canSelect && tappedSelectedSong))
 		{
 			select();
 		}

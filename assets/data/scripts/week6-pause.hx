@@ -54,8 +54,6 @@ function create(event) {
 
 	FlxTween.tween(bg.scale, {y: 6}, 0.75, {ease: FlxEase.elasticOut});
 
-	if (FlxG.onMobile) addBackButton();
-
 	FlxG.sound.play(Paths.sound(isThorns ? 'pixel/ANGRY' : 'pixel/clickText'));
 }
 
@@ -89,23 +87,24 @@ function update(elapsed) {
 
 	changeSelection((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - FlxG.mouse.wheel + TouchUtil.verticalScroll);
 
-	if (FlxG.onMobile && mobileBackPressed) {
-		var resumeIndex = menuItems.indexOf("Resume");
-		if (resumeIndex >= 0) {
-			curSelected = resumeIndex;
-			enterOption();
-		}
-		return;
-	}
-
 	if (TouchUtil.tapped) {
+		var tapY = FlxG.mouse.gameY;
+		var picked = -1;
+		var bestDistance = 99999.0;
 		for (i in 0...menuItems.length) {
 			var itemText = texts[i + 1];
-			if (itemText != null && TouchUtil.overlaps(itemText, pauseCam)) {
-				if (i == curSelected) enterOption();
-				else changeSelection(i - curSelected);
-				return;
+			if (itemText == null) continue;
+			var center = itemText.y + itemText.height / 2;
+			var distance = Math.abs(tapY - center);
+			if (distance <= itemText.height / 2 + 18 && distance < bestDistance) {
+				bestDistance = distance;
+				picked = i;
 			}
+		}
+		if (picked >= 0) {
+			if (picked == curSelected) enterOption();
+			else changeSelection(picked - curSelected);
+			return;
 		}
 	}
 

@@ -195,13 +195,11 @@ class MainMenuState extends MusicBeatState
 			if (controls.ACCEPT)
 				selectItem();
 
-			if (TouchUtil.tapped && menuItems != null && !selectedSomethin && !MobileButton.isBlocking()) {
-				for (index => sprite in menuItems.members) {
-					if (TouchUtil.overlaps(sprite)) {
-						if (curSelected != index) changeItem(index - curSelected);
-						else selectItem();
-						break;
-					}
+			if (menuItems != null && !selectedSomethin && !MobileButton.isBlocking() && !TouchUtil.overlaps(versionText)) {
+				var index = TouchUtil.tappedRow(menuItems.members, null, 10);
+				if (index >= 0) {
+					if (curSelected != index) changeItem(index - curSelected);
+					else selectItem();
 				}
 			}
 		}

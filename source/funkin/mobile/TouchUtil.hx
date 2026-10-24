@@ -128,6 +128,44 @@ class TouchUtil
 		#end
 	}
 
+	public static function pickRow<T:FlxObject>(objects:Array<T>, ?camera:FlxCamera, padding:Float = 16):Int
+	{
+		#if FLX_MOUSE
+		if (objects == null)
+			return -1;
+		var best = -1;
+		var bestDistance = Math.POSITIVE_INFINITY;
+		for (index => obj in objects)
+		{
+			if (obj == null || !obj.exists || !obj.visible)
+				continue;
+			var cam = camera != null ? camera : obj.getDefaultCamera();
+			var point = FlxG.mouse.getWorldPosition(cam);
+			var screen = obj.getScreenPosition(null, cam);
+			var py = point.y - cam.scroll.y;
+			var top = screen.y - padding;
+			var bottom = screen.y + obj.height + padding;
+			if (py >= top && py <= bottom)
+			{
+				var distance = Math.abs(py - (screen.y + obj.height / 2));
+				if (distance < bestDistance)
+				{
+					bestDistance = distance;
+					best = index;
+				}
+			}
+			screen.put();
+			point.put();
+		}
+		return best;
+		#else
+		return -1;
+		#end
+	}
+
+	public static function tappedRow<T:FlxObject>(objects:Array<T>, ?camera:FlxCamera, padding:Float = 16):Int
+		return tapped ? pickRow(objects, camera, padding) : -1;
+
 	public static function pressedOn(object:FlxBasic, ?camera:FlxCamera):Bool
 		return justPressed && !MobileButton.isBlocking() && overlaps(object, camera);
 

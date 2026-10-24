@@ -131,7 +131,6 @@ class PauseSubState extends MusicBeatSubstate
 		camera.bgColor = 0;
 		FlxG.cameras.add(camera, false);
 
-		addBackButton();
 	}
 
 	override function createPost() {
@@ -158,24 +157,12 @@ class PauseSubState extends MusicBeatSubstate
 		if (upP || downP || scroll != 0)  // like this we wont break mods that expect a 0 change event when calling sometimes  - Nex
 			changeSelection((upP ? -1 : 0) + (downP ? 1 : 0) - scroll);
 
-		if (mobileBackPressed) {
-			var resumeIndex = menuItems.indexOf("Resume");
-			if (resumeIndex >= 0) {
-				curSelected = resumeIndex;
-				selectOption();
-			}
-			else
-				close();
-			return;
-		}
-
-		if (TouchUtil.tapped && grpMenuShit != null) {
-			for (index => item in grpMenuShit.members) {
-				if (item != null && TouchUtil.overlaps(item, camera)) {
-					if (index != curSelected) changeSelection(index - curSelected);
-					else selectOption();
-					return;
-				}
+		if (grpMenuShit != null) {
+			var index = TouchUtil.tappedRow(grpMenuShit.members, camera, 18);
+			if (index >= 0) {
+				if (index != curSelected) changeSelection(index - curSelected);
+				else selectOption();
+				return;
 			}
 		}
 

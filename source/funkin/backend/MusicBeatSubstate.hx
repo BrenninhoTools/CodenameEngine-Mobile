@@ -172,6 +172,7 @@ class MusicBeatSubstate extends FlxSubState implements IBeatCancellableReceiver
 
 	override function create()
 	{
+		funkin.mobile.TouchUtil.reset();
 		loadScript();
 		super.create();
 		call("create");
