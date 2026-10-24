@@ -123,8 +123,15 @@ class Framerate extends Sprite {
 		super.__enterFrame(t);
 		bgSprite.alpha = debugAlpha * 0.5;
 
+		#if mobile
+		var gameX:Float = FlxG.game != null ? FlxG.game.x : 0;
+		var gameY:Float = FlxG.game != null ? FlxG.game.y : 0;
+		x = Math.max(gameX, funkin.backend.system.Main.safeInsetLeft) + 8 * scaleX + offset.x * FlxG.scaleMode.scale.x;
+		y = Math.max(gameY, funkin.backend.system.Main.safeInsetTop) + 4 * scaleY + offset.y * FlxG.scaleMode.scale.y;
+		#else
 		x = 10 + offset.x * FlxG.scaleMode.scale.x;
 		y = 2 + offset.y * FlxG.scaleMode.scale.y;
+		#end
 
 		var width = MathUtil.maxSmart(fpsCounter.width, memoryCounter.width #if SHOW_BUILD_ON_FPS , codenameBuildField.width #end) + (x*2);
 		var height = #if SHOW_BUILD_ON_FPS codenameBuildField.y + codenameBuildField.height #else memoryCounter.y + memoryCounter.height #end;
@@ -149,5 +156,16 @@ class Framerate extends Sprite {
 			c.y = y;
 			y = c.y + c.height + 4;
 		}
+
+		#if mobile
+		if (stage != null && y > 0) {
+			var gameHeight:Float = FlxG.scaleMode != null ? FlxG.scaleMode.gameSize.y : stage.stageHeight;
+			var available = Math.max(64, Math.min(stage.stageHeight, gameHeight) - (this.y - (FlxG.game != null ? FlxG.game.y : 0)) - 8);
+			var target = funkin.backend.system.Main.framerateBaseScale;
+			if (debugAlpha > 0.05)
+				target = Math.min(target, available / y);
+			scaleX = scaleY = Math.max(0.35, target);
+		}
+		#end
 	}
 }

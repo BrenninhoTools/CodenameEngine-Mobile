@@ -199,11 +199,36 @@ class Main extends Sprite
 		});
 	}
 
+	public static var safeInsetLeft:Float = 0;
+	public static var safeInsetTop:Float = 0;
+	public static var safeInsetRight:Float = 0;
+	public static var safeInsetBottom:Float = 0;
+	public static var framerateBaseScale:Float = 1;
+
+	static function updateSafeInsets() {
+		#if android
+		try {
+			var method:Dynamic = lime.system.JNI.createStaticMethod("org/codename/mobile/ScreenHelper", "getSafeInsets", "()Ljava/lang/String;");
+			if (method == null) return;
+			var parts = Std.string(method()).split(",");
+			if (parts.length == 4) {
+				safeInsetLeft = Math.max(0, Std.parseFloat(parts[0]));
+				safeInsetTop = Math.max(0, Std.parseFloat(parts[1]));
+				safeInsetRight = Math.max(0, Std.parseFloat(parts[2]));
+				safeInsetBottom = Math.max(0, Std.parseFloat(parts[3]));
+			}
+		} catch (_:Dynamic) {}
+		#end
+	}
+
 	static function updateMobileFramerateScale() {
 		if (framerateSprite == null || Lib.current.stage == null) return;
-		Framerate.offset.x = 24;
-		var scale = Math.max(0.75, Math.min(Lib.current.stage.stageWidth / 1280, Lib.current.stage.stageHeight / 720) * 0.9);
-		framerateSprite.scaleX = framerateSprite.scaleY = scale;
+		updateSafeInsets();
+		Framerate.offset.x = 0;
+		var gameScale:Float = FlxG.scaleMode != null ? FlxG.scaleMode.scale.y : Lib.current.stage.stageHeight / 720;
+		if (gameScale <= 0 || Math.isNaN(gameScale)) gameScale = 1;
+		framerateBaseScale = FlxMath.bound(gameScale * 0.8, 0.6, 2.4);
+		framerateSprite.scaleX = framerateSprite.scaleY = framerateBaseScale;
 	}
 
 	static function scheduleScreenRefresh() {
