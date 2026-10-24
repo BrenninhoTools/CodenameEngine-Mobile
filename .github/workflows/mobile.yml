@@ -2,7 +2,19 @@ name: Mobile Builds
 
 on:
   push:
+    paths-ignore:
+      - '**.md'
+      - 'art/**'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'LICENSE'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'art/**'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'LICENSE'
   workflow_dispatch:
 
 concurrency:
@@ -14,6 +26,7 @@ env:
   NDK_VERSION: r27c
   LIBS_CACHE_VERSION: v5
   HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
+  GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false
 
 jobs:
   android:
@@ -25,6 +38,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          filter: blob:none
 
       - name: Setting up Java
         uses: actions/setup-java@v5
@@ -32,13 +46,26 @@ jobs:
           distribution: zulu
           java-version: 17
 
+      - name: Finding a preinstalled Android NDK
+        id: find-ndk
+        run: |
+          for dir in $(ls -d $ANDROID_HOME/ndk/27.* 2>/dev/null | sort -V -r); do
+            if [ -x "$dir/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" ]; then
+              echo "Using preinstalled NDK $dir"
+              echo "path=$dir" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "No preinstalled NDK 27 found, downloading ${{ env.NDK_VERSION }}"
+
       - name: Setting up Android NDK
         id: setup-ndk
+        if: steps.find-ndk.outputs.path == ''
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: ${{ env.NDK_VERSION }}
           add-to-path: false
-          local-cache: false
+          local-cache: true
 
       - name: Setting up Haxe
         uses: krdlab/setup-haxe@v2
@@ -68,7 +95,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-android-${{ hashFiles('project.xml') }}
+          key: gradle-android-${{ hashFiles('project.xml', 'android/**') }}
           restore-keys: gradle-android-
 
       - name: Updating haxelib
@@ -82,14 +109,15 @@ jobs:
 
       - name: Configuring Lime for Android
         run: |
-          NDK=${{ steps.setup-ndk.outputs.ndk-path }}
+          NDK="${{ steps.find-ndk.outputs.path }}"
+          if [ -z "$NDK" ]; then NDK="${{ steps.setup-ndk.outputs.ndk-path }}"; fi
           echo "ANDROID_NDK_ROOT=$NDK" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$NDK" >> $GITHUB_ENV
           echo "ANDROID_HOST=linux-x86_64" >> $GITHUB_ENV
           echo "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
           ls $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++
           haxelib run lime config ANDROID_SDK $ANDROID_HOME -nocffi
-          haxelib run lime config ANDROID_NDK_ROOT ${{ steps.setup-ndk.outputs.ndk-path }} -nocffi
+          haxelib run lime config ANDROID_NDK_ROOT $NDK -nocffi
           haxelib run lime config JAVA_HOME $JAVA_HOME -nocffi
           haxelib run lime config ANDROID_SETUP true -nocffi
 
@@ -174,6 +202,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          filter: blob:none
 
       - name: Setting up Haxe
         uses: krdlab/setup-haxe@v2
