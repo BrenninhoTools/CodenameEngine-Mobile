@@ -152,6 +152,25 @@ jobs:
             find .hxcpp_cache -type d -name "pch*" -prune -exec rm -rf {} +
           fi
 
+      - name: Configuring Gradle for faster builds
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/fast-build.gradle <<'EOF'
+          allprojects {
+              tasks.configureEach { task ->
+                  if (task.name.startsWith('lintVital') || task.name.startsWith('lintAnalyze') || task.name.startsWith('generateReleaseLintVital'))
+                      task.enabled = false
+              }
+              afterEvaluate { project ->
+                  def android = project.extensions.findByName('android')
+                  if (android != null) {
+                      try { android.lint.checkReleaseBuilds = false } catch (ignored) {}
+                      try { android.androidResources.noCompress.addAll(['.png', '.ogg', '.mp3', '.wav', '.ttf', '.otf', '.xml', '.json', '.txt', '.hx', '.hscript', '.frag', '.vert', '.lua', '.ini', '.csv', '.mp4', '.webm', '.zip', '.version']) } catch (ignored) {}
+                  }
+              }
+          }
+          EOF
+
       - name: Building the game
         run: haxelib run lime build android -release -arm64 -DCOMPILE_EXPERIMENTAL
 
