@@ -693,6 +693,42 @@ class StorageUtil
 		return buf.toString().toLowerCase();
 	}
 
+	public static function startBatchCopy(jobs:String, threads:Int):Bool
+	{
+		#if android
+		return AndroidStorage.startBatchCopy(jobs, threads);
+		#else
+		return false;
+		#end
+	}
+
+	public static function getBatchCompleted():Int
+	{
+		#if android
+		return AndroidStorage.getBatchCompleted();
+		#else
+		return 0;
+		#end
+	}
+
+	public static function isBatchRunning():Bool
+	{
+		#if android
+		return AndroidStorage.isBatchRunning();
+		#else
+		return false;
+		#end
+	}
+
+	public static function getBatchFailed():String
+	{
+		#if android
+		return AndroidStorage.getBatchFailed();
+		#else
+		return "";
+		#end
+	}
+
 	public static function getFreeSpace(?path:String):Float
 	{
 		#if android
@@ -811,6 +847,64 @@ class AndroidStorage
 		catch (e:Dynamic)
 		{
 			return false;
+		}
+	}
+
+	public static function startBatchCopy(jobs:String, threads:Int):Bool
+	{
+		try
+		{
+			var method = getMethod("startBatchCopy", "(Ljava/lang/String;I)Z");
+			return method != null && method(jobs, threads) == true;
+		}
+		catch (e:Dynamic)
+		{
+			return false;
+		}
+	}
+
+	public static function getBatchCompleted():Int
+	{
+		try
+		{
+			var method = getMethod("getBatchCompleted", "()I");
+			if (method == null)
+				return 0;
+			var value:Dynamic = method();
+			return value == null ? 0 : Std.int(value);
+		}
+		catch (e:Dynamic)
+		{
+			return 0;
+		}
+	}
+
+	public static function isBatchRunning():Bool
+	{
+		try
+		{
+			var method = getMethod("isBatchRunning", "()Z");
+			return method != null && method() == true;
+		}
+		catch (e:Dynamic)
+		{
+			return false;
+		}
+	}
+
+	public static function getBatchFailed():String
+	{
+		try
+		{
+			var method = getMethod("getBatchFailed", "()Ljava/lang/String;");
+			if (method == null)
+				return "";
+			var value:Dynamic = method();
+			return value == null ? "" : Std.string(value);
+		}
+		catch (e:Dynamic)
+		{
+			return "";
 		}
 	}
 

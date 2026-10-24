@@ -182,13 +182,14 @@ class CopyState extends FlxState
 		#if (sys && mobile)
 		var root = StorageUtil.storageDirectory;
 		overwrite = StorageUtil.isReextractRequested();
+		var fresh = !StorageUtil.hasExtractedAssets();
 
 		for (id in getFilesToCopy())
-			if (overwrite || missing(id))
+			if (overwrite || fresh || missing(id))
 				jobs.push({kind: ASSET, source: id, target: root + id});
 
 		for (id in getBundledFiles())
-			if (missing(id))
+			if (fresh || missing(id))
 				jobs.push({kind: BUNDLED, source: id, target: root + id});
 
 		migrationSource = StorageUtil.getPreviousDirectory();
@@ -196,6 +197,10 @@ class CopyState extends FlxState
 			for (file in StorageUtil.getMigrationFiles())
 				if (!file.endsWith(".tmp") && missing(file))
 					jobs.push({kind: MIGRATE, source: migrationSource + file, target: root + file});
+		#end
+
+		#if android
+		startBatch();
 		#end
 
 		statusText = new FlxText(0, FlxG.height * 0.4, FlxG.width, getStatus(), 32);
@@ -236,6 +241,14 @@ class CopyState extends FlxState
 		if (finished)
 			return;
 
+		#if android
+		if (batchActive)
+		{
+			updateBatch();
+			return;
+		}
+		#end
+
 		#if (sys && mobile)
 		var start = haxe.Timer.stamp();
 		while (index < jobs.length && haxe.Timer.stamp() - start < FRAME_BUDGET)
@@ -269,6 +282,95 @@ class CopyState extends FlxState
 			}
 		}
 	}
+
+	#if android
+	static inline var BATCH_THREADS:Int = 4;
+
+	var batchActive:Bool = false;
+	var batchLines:Map<String, CopyJob> = [];
+	var batchTotal:Int = 0;
+	var batchStart:Float = 0;
+
+	function startBatch()
+	{
+		var lines:Array<String> = [];
+		var sequential:Array<CopyJob> = [];
+		for (job in jobs)
+		{
+			var line:String = null;
+			switch (job.kind)
+			{
+				case ASSET, BUNDLED:
+					if (!StorageUtil.isFontAsset(job.source))
+					{
+						var path:String = null;
+						try
+						{
+							path = lime.utils.Assets.getPath(job.source);
+						}
+						catch (e:Dynamic) {}
+						if (path != null && path.length > 0)
+							line = 'A\t$path\t${job.target}';
+					}
+				case MIGRATE:
+					line = 'F\t${job.source}\t${job.target}';
+					batchHasMigration = true;
+			}
+			if (line != null && line.indexOf("\n") < 0)
+			{
+				lines.push(line);
+				batchLines.set(line, job);
+			}
+			else
+				sequential.push(job);
+		}
+
+		if (lines.length == 0 || !StorageUtil.startBatchCopy(lines.join("\n"), BATCH_THREADS))
+		{
+			batchLines.clear();
+			return;
+		}
+
+		jobs = sequential;
+		batchTotal = lines.length;
+		batchActive = true;
+		batchStart = haxe.Timer.stamp();
+	}
+
+	function updateBatch()
+	{
+		var completed = StorageUtil.getBatchCompleted();
+		var total = batchTotal + jobs.length;
+		progressBar.scale.x = total == 0 ? 1 : completed / total;
+		statusText.text = getBatchStatus();
+		progressText.text = '$completed / $total';
+
+		if (StorageUtil.isBatchRunning())
+			return;
+
+		batchActive = false;
+		var failed = StorageUtil.getBatchFailed();
+		var failedCount = 0;
+		if (failed != null && failed.length > 0)
+			for (line in failed.split("\n"))
+			{
+				var job = batchLines.get(line);
+				if (job != null)
+				{
+					jobs.push(job);
+					failedCount++;
+				}
+			}
+		Logs.trace('[CopyState] Copied ${batchTotal - failedCount}/$batchTotal files in ${Math.round((haxe.Timer.stamp() - batchStart) * 1000)}ms using $BATCH_THREADS threads, ${jobs.length} left for the fallback copier', INFO);
+		batchLines.clear();
+		index = 0;
+	}
+
+	var batchHasMigration:Bool = false;
+
+	function getBatchStatus():String
+		return batchHasMigration ? "Moving mods to the new storage..." : "Extracting assets...";
+	#end
 
 	function runJob(job:CopyJob):Bool
 	{
