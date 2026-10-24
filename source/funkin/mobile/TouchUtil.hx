@@ -7,8 +7,18 @@ import flixel.FlxObject;
 
 class TouchUtil
 {
-	public static var tapDistance:Float = 24;
-	public static var swipeDistance:Float = 70;
+	public static inline var DEFAULT_STEP_SIZE:Float = 80;
+	public static inline var DEFAULT_TAP_DISTANCE:Float = 28;
+	public static inline var DEFAULT_SWIPE_DISTANCE:Float = 70;
+
+	public static var tapDistance:Float = DEFAULT_TAP_DISTANCE;
+	public static var swipeDistance:Float = DEFAULT_SWIPE_DISTANCE;
+	public static var stepSize:Float = DEFAULT_STEP_SIZE;
+	public static var tapMaxTime:Float = 0.45;
+	public static var momentumEnabled:Bool = true;
+	public static var momentumFriction:Float = 5;
+	public static var momentumMinSpeed:Float = 450;
+	public static var maxStepsPerFrame:Int = 3;
 
 	public static var pressed(get, never):Bool;
 	public static var justPressed(get, never):Bool;
@@ -23,16 +33,35 @@ class TouchUtil
 	public static var verticalScroll(get, never):Int;
 	public static var horizontalScroll(get, never):Int;
 
+	public static var dragging(get, never):Bool;
+	public static var dragX(get, never):Float;
+	public static var dragY(get, never):Float;
+	public static var deltaX(get, never):Float;
+	public static var deltaY(get, never):Float;
+
 	static var initialized:Bool = false;
 	static var frame:Int = 0;
 	static var lastFrame:Int = -1;
+
 	static var tracking:Bool = false;
+	static var moved:Bool = false;
+	static var axis:Int = 0;
 	static var startX:Float = 0;
 	static var startY:Float = 0;
+	static var lastX:Float = 0;
+	static var lastY:Float = 0;
+	static var startTime:Float = 0;
+	static var pendingY:Float = 0;
+	static var velocityY:Float = 0;
+	static var momentumY:Float = 0;
+	static var stepsEmitted:Int = 0;
 
 	static var _tapped:Bool = false;
 	static var _swipeX:Int = 0;
 	static var _swipeY:Int = 0;
+	static var _stepsY:Int = 0;
+	static var _deltaX:Float = 0;
+	static var _deltaY:Float = 0;
 
 	public static function init()
 	{
@@ -41,15 +70,38 @@ class TouchUtil
 		initialized = true;
 		FlxG.signals.preUpdate.add(onPreUpdate);
 		FlxG.signals.postUpdate.add(refresh);
-		FlxG.signals.preStateSwitch.add(reset);
+		FlxG.signals.preStateSwitch.add(onStateSwitch);
+	}
+
+	static function onStateSwitch()
+	{
+		stepSize = DEFAULT_STEP_SIZE;
+		tapDistance = DEFAULT_TAP_DISTANCE;
+		swipeDistance = DEFAULT_SWIPE_DISTANCE;
+		reset();
 	}
 
 	public static function reset()
 	{
 		tracking = false;
+		moved = false;
+		axis = 0;
+		pendingY = 0;
+		velocityY = 0;
+		momentumY = 0;
+		stepsEmitted = 0;
 		_tapped = false;
 		_swipeX = 0;
 		_swipeY = 0;
+		_stepsY = 0;
+		_deltaX = 0;
+		_deltaY = 0;
+	}
+
+	public static function stopMomentum()
+	{
+		momentumY = 0;
+		pendingY = 0;
 	}
 
 	public static function overlaps(object:FlxBasic, ?camera:FlxCamera):Bool
@@ -111,34 +163,109 @@ class TouchUtil
 		_tapped = false;
 		_swipeX = 0;
 		_swipeY = 0;
+		_stepsY = 0;
+		_deltaX = 0;
+		_deltaY = 0;
 
 		#if FLX_MOUSE
 		var mouse = FlxG.mouse;
+		var elapsed = Math.max(FlxG.elapsed, 0.0001);
+		var now = haxe.Timer.stamp();
 
 		if (mouse.justPressed)
 		{
 			tracking = !MobileButton.isBlocking();
-			startX = mouse.gameX;
-			startY = mouse.gameY;
+			moved = false;
+			axis = 0;
+			startX = lastX = mouse.gameX;
+			startY = lastY = mouse.gameY;
+			startTime = now;
+			pendingY = 0;
+			velocityY = 0;
+			momentumY = 0;
+			stepsEmitted = 0;
+		}
+
+		if (tracking && (mouse.pressed || mouse.justReleased))
+		{
+			var x = mouse.gameX;
+			var y = mouse.gameY;
+			_deltaX = x - lastX;
+			_deltaY = y - lastY;
+			lastX = x;
+			lastY = y;
+
+			var totalX = x - startX;
+			var totalY = y - startY;
+			if (!moved && (Math.abs(totalX) > tapDistance || Math.abs(totalY) > tapDistance))
+			{
+				moved = true;
+				axis = Math.abs(totalY) >= Math.abs(totalX) ? 1 : 2;
+				if (axis == 1)
+					pendingY = -totalY;
+			}
+			else if (moved && axis == 1)
+				pendingY -= _deltaY;
+
+			if (moved && axis == 1)
+			{
+				var instant = -_deltaY / elapsed;
+				velocityY = velocityY * 0.6 + instant * 0.4;
+				emitSteps();
+			}
 		}
 
 		if (mouse.justReleased && tracking)
 		{
 			tracking = false;
-
 			var dx:Float = mouse.gameX - startX;
 			var dy:Float = mouse.gameY - startY;
 			var absX:Float = Math.abs(dx);
 			var absY:Float = Math.abs(dy);
 
-			if (absX <= tapDistance && absY <= tapDistance)
+			if (!moved && absX <= tapDistance && absY <= tapDistance && now - startTime <= tapMaxTime)
 				_tapped = true;
-			else if (absX > absY && absX >= swipeDistance)
+			else if (axis == 2 && absX >= swipeDistance)
 				_swipeX = dx > 0 ? 1 : -1;
-			else if (absY >= absX && absY >= swipeDistance)
-				_swipeY = dy > 0 ? 1 : -1;
+			else if (axis == 1)
+			{
+				if (stepsEmitted == 0 && absY >= swipeDistance)
+				{
+					_swipeY = dy > 0 ? 1 : -1;
+					if (_stepsY == 0)
+						_stepsY = -_swipeY;
+				}
+				if (momentumEnabled && Math.abs(velocityY) >= momentumMinSpeed)
+					momentumY = velocityY;
+			}
+			pendingY = 0;
+		}
+
+		if (!tracking && momentumY != 0)
+		{
+			pendingY += momentumY * elapsed;
+			momentumY *= Math.exp(-momentumFriction * elapsed);
+			if (Math.abs(momentumY) < momentumMinSpeed * 0.5)
+			{
+				momentumY = 0;
+				pendingY = 0;
+			}
+			else
+				emitSteps();
 		}
 		#end
+	}
+
+	static function emitSteps()
+	{
+		var size = Math.max(10, stepSize);
+		while (Math.abs(pendingY) >= size && Math.abs(_stepsY) < maxStepsPerFrame)
+		{
+			var direction = pendingY > 0 ? 1 : -1;
+			_stepsY += direction;
+			pendingY -= direction * size;
+			stepsEmitted++;
+		}
 	}
 
 	static function get_pressed():Bool
@@ -201,12 +328,42 @@ class TouchUtil
 	static function get_verticalScroll():Int
 	{
 		refresh();
-		return -_swipeY;
+		return _stepsY;
 	}
 
 	static function get_horizontalScroll():Int
 	{
 		refresh();
 		return -_swipeX;
+	}
+
+	static function get_dragging():Bool
+	{
+		refresh();
+		return tracking && moved;
+	}
+
+	static function get_dragX():Float
+	{
+		refresh();
+		return lastX - startX;
+	}
+
+	static function get_dragY():Float
+	{
+		refresh();
+		return lastY - startY;
+	}
+
+	static function get_deltaX():Float
+	{
+		refresh();
+		return _deltaX;
+	}
+
+	static function get_deltaY():Float
+	{
+		refresh();
+		return _deltaY;
 	}
 }

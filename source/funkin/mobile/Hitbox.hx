@@ -104,11 +104,19 @@ class Hitbox extends FlxTypedSpriteGroup<FlxSprite>
 
 		#if FLX_TOUCH
 		for (touch in FlxG.touches.list)
+		{
 			if (touch.pressed || touch.justPressed)
 			{
 				touch.getWorldPosition(camera, world);
 				processPointer(touch.touchPointID, touch.gameX, touch.gameY, world.x, world.y, touch.justPressed, currentLanes);
 			}
+			else if (touch.justReleased && !touchLanes.exists(touch.touchPointID))
+			{
+				touch.getWorldPosition(camera, world);
+				var quickTap:Map<Int, Int> = new Map();
+				processPointer(touch.touchPointID, touch.gameX, touch.gameY, world.x, world.y, true, quickTap);
+			}
+		}
 		#elseif FLX_MOUSE
 		if (FlxG.mouse.pressed || FlxG.mouse.justPressed)
 		{
