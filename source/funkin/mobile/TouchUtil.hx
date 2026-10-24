@@ -19,6 +19,8 @@ class TouchUtil
 	public static var momentumFriction:Float = 5;
 	public static var momentumMinSpeed:Float = 450;
 	public static var maxStepsPerFrame:Int = 3;
+	public static var firstStepRatio:Float = 0.6;
+	public static var flickSpeed:Float = 900;
 
 	public static var pressed(get, never):Bool;
 	public static var justPressed(get, never):Bool;
@@ -53,6 +55,8 @@ class TouchUtil
 	static var startTime:Float = 0;
 	static var pendingY:Float = 0;
 	static var velocityY:Float = 0;
+	static var velocityX:Float = 0;
+	static var horizontalFired:Bool = false;
 	static var momentumY:Float = 0;
 	static var stepsEmitted:Int = 0;
 
@@ -88,6 +92,8 @@ class TouchUtil
 		axis = 0;
 		pendingY = 0;
 		velocityY = 0;
+		velocityX = 0;
+		horizontalFired = false;
 		momentumY = 0;
 		stepsEmitted = 0;
 		_tapped = false;
@@ -220,6 +226,8 @@ class TouchUtil
 			startTime = now;
 			pendingY = 0;
 			velocityY = 0;
+			velocityX = 0;
+			horizontalFired = false;
 			momentumY = 0;
 			stepsEmitted = 0;
 		}
@@ -245,11 +253,15 @@ class TouchUtil
 			else if (moved && axis == 1)
 				pendingY -= _deltaY;
 
+			velocityX = velocityX * 0.6 + (_deltaX / elapsed) * 0.4;
+			velocityY = velocityY * 0.6 + (-_deltaY / elapsed) * 0.4;
+
 			if (moved && axis == 1)
-			{
-				var instant = -_deltaY / elapsed;
-				velocityY = velocityY * 0.6 + instant * 0.4;
 				emitSteps();
+			else if (moved && axis == 2 && !horizontalFired && Math.abs(totalX) >= swipeDistance)
+			{
+				horizontalFired = true;
+				_swipeX = totalX > 0 ? 1 : -1;
 			}
 		}
 
@@ -263,11 +275,15 @@ class TouchUtil
 
 			if (!moved && absX <= tapDistance && absY <= tapDistance && now - startTime <= tapMaxTime)
 				_tapped = true;
-			else if (axis == 2 && absX >= swipeDistance)
-				_swipeX = dx > 0 ? 1 : -1;
+			else if (axis == 2)
+			{
+				if (!horizontalFired && (absX >= swipeDistance || (absX >= swipeDistance * 0.5 && Math.abs(velocityX) >= flickSpeed)))
+					_swipeX = dx > 0 ? 1 : -1;
+				horizontalFired = true;
+			}
 			else if (axis == 1)
 			{
-				if (stepsEmitted == 0 && absY >= swipeDistance)
+				if (stepsEmitted == 0 && (absY >= swipeDistance || (absY >= swipeDistance * 0.5 && Math.abs(velocityY) >= flickSpeed)))
 				{
 					_swipeY = dy > 0 ? 1 : -1;
 					if (_stepsY == 0)
@@ -297,11 +313,14 @@ class TouchUtil
 	static function emitSteps()
 	{
 		var size = Math.max(10, stepSize);
-		while (Math.abs(pendingY) >= size && Math.abs(_stepsY) < maxStepsPerFrame)
+		while (Math.abs(_stepsY) < maxStepsPerFrame)
 		{
+			var threshold = stepsEmitted == 0 ? size * firstStepRatio : size;
+			if (Math.abs(pendingY) < threshold)
+				break;
 			var direction = pendingY > 0 ? 1 : -1;
 			_stepsY += direction;
-			pendingY -= direction * size;
+			pendingY -= direction * threshold;
 			stepsEmitted++;
 		}
 	}
