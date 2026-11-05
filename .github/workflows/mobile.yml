@@ -24,7 +24,7 @@ concurrency:
 env:
   HAXE_VERSION: 4.3.7
   NDK_VERSION: r27c
-  LIBS_CACHE_VERSION: v5
+  LIBS_CACHE_VERSION: v6
   HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
   GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false
 
@@ -129,12 +129,21 @@ jobs:
           libegl1-mesa-dev libgl1-mesa-dev libibus-1.0-dev libdbus-1-dev libdecor-0-dev libudev-dev libgbm-dev libdrm-dev \
           libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libglu1-mesa-dev libmbedtls-dev libuv1-dev libsqlite3-dev \
           libx11-dev libxext-dev libxfixes-dev libxi-dev libxinerama-dev libxkbcommon-dev libxcursor-dev libxrandr-dev libxss-dev libxt-dev libxtst-dev libxv-dev libxxf86vm-dev \
-          libpulse-dev libasound2-dev libpipewire-0.3-dev
+          libpulse-dev libasound2-dev libpipewire-0.3-dev libwayland-dev libwayland-bin wayland-protocols
 
       - name: Rebuilding Lime and Hxcpp
         if: steps.libs-cache.outputs.cache-hit != 'true'
         run: |
           haxelib run lime rebuild hxcpp -nocffi
+          LIME_PROJECT="$(haxelib libpath lime)/project"
+          PROTOCOLS="$LIME_PROJECT/lib/sdl/wayland-protocols"
+          GENERATED="$LIME_PROJECT/lib/sdl/wayland-generated-protocols"
+          mkdir -p "$GENERATED"
+          for xml in "$PROTOCOLS"/*.xml; do
+            name="$(basename "$xml" .xml)-client-protocol"
+            wayland-scanner client-header "$xml" "$GENERATED/$name.h"
+            wayland-scanner private-code "$xml" "$GENERATED/$name.c"
+          done
           haxelib run lime rebuild linux -64 -release -nocolor -nocffi
           haxelib run lime rebuild tools
           haxelib run lime rebuild android -release -nocolor -arm64
