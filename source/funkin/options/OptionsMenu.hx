@@ -139,7 +139,9 @@ class OptionsMenu extends TreeMenu {
 
 	override function onResize(width:Int, height:Int) {
 		super.onResize(width, height);
+		#if !mobile
 		if (!UIState.resolutionAware) return;
+		#end
 
 		updateBG();
 	}

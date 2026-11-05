@@ -860,6 +860,9 @@ class PlayState extends MusicBeatState
 			var startingPos:FlxPoint = strumLine.strumPos != null ?
 				FlxPoint.get(strumLine.strumPos[0] == 0 ? strXPos : strumLine.strumPos[0], strumLine.strumPos[1]) :
 				FlxPoint.get(strXPos, this.strumLine.y);
+			#if mobile
+			startingPos.x = fitMobileStrumX(startingPos.x, strScale, strSpacing, keyCount, strumLine.strumPos != null && strumLine.strumPos[0] != 0);
+			#end
 			var strLine = new StrumLine(chars,
 				startingPos,
 				strScale,
@@ -1010,14 +1013,21 @@ class PlayState extends MusicBeatState
 		return strLine == null ? null : [for (strum in strLine.members) strum];
 	}
 
+	function fitMobileStrumX(x:Float, scale:Float, spacing:Float, keyCount:Int, absolute:Bool):Float {
+		var width = Note.swagWidth * scale * (spacing * (keyCount - 1) + 1);
+		return funkin.backend.utils.ScreenUtil.fitStrumX(x, width, absolute);
+	}
+
 	public function applyMobileArrowsLayout() {
 		if (!funkin.mobile.Hitbox.isArrowsMode()) return;
+		var area = funkin.backend.utils.ScreenUtil.usableArea();
+		var areaWidth = area.right - area.left;
 		for (strLine in strumLines.members) {
 			if (strLine == null || strLine.cpu) continue;
 			var count = strLine.members.length;
 			for (i => strum in strLine.members)
 				if (strum != null)
-					strum.x = (FlxG.width * ((1 - funkin.mobile.Hitbox.ARROWS_SPREAD) / 2 + funkin.mobile.Hitbox.ARROWS_SPREAD * (i + 0.5) / count)) - (strum.width / 2);
+					strum.x = area.left + (areaWidth * ((1 - funkin.mobile.Hitbox.ARROWS_SPREAD) / 2 + funkin.mobile.Hitbox.ARROWS_SPREAD * (i + 0.5) / count)) - (strum.width / 2);
 		}
 	}
 
@@ -1304,6 +1314,9 @@ class PlayState extends MusicBeatState
 				(strumLine.strumPos != null && strumLine.strumPos[0] != 0) ? strumLine.strumPos[0] : strXPos,
 				strumLine.strumPos != null ? strumLine.strumPos[1] : this.strumLine.y
 			);
+			#if mobile
+			strLine.startingPos.x = fitMobileStrumX(strLine.startingPos.x, strScale, strSpacing, keyCount, strumLine.strumPos != null && strumLine.strumPos[0] != 0);
+			#end
 			strLine.resetStrumPositions();
 			strLine.visible = (strumLine.visible != false && (!canCenter || !strLine.cpu));
 		}
@@ -1946,6 +1959,9 @@ class PlayState extends MusicBeatState
 
 		deathCounter++;
 
+		#if mobile
+		funkin.mobile.Haptics.death();
+		#end
 		openSubState(new GameOverSubstate(event.x, event.y, event.deathCharID, event.isPlayer, event.gameOverSong, event.lossSFX, event.retrySFX));
 
 		gameAndCharsEvent("onPostGameOver", event);
@@ -2098,6 +2114,9 @@ class PlayState extends MusicBeatState
 		misses += event.misses;
 
 		if (event.playMissSound) FlxG.sound.play(event.missSound, event.missVolume);
+		#if mobile
+		if (strumLine != null && !strumLine.cpu) funkin.mobile.Haptics.miss();
+		#end
 
 		if (event.muteVocals) {
 			vocals.volume = 0;

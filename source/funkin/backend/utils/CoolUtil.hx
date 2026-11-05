@@ -508,6 +508,14 @@ final class CoolUtil
 	 * @param volume At which volume it should play
 	 */
 	@:noUsing public static inline function playMenuSFX(menuSFX:CoolSfx = SCROLL, volume:Float = 1):FlxSound {
+		#if mobile
+		switch (menuSFX) {
+			case CONFIRM: funkin.mobile.Haptics.confirm();
+			case CANCEL: funkin.mobile.Haptics.light();
+			case WARNING: funkin.mobile.Haptics.medium();
+			default: funkin.mobile.Haptics.select();
+		}
+		#end
 		return FlxG.sound.play(Paths.sound(switch(menuSFX) {
 			case CONFIRM:	Flags.DEFAULT_MENU_CONFIRM_SOUND;
 			case CANCEL:	Flags.DEFAULT_MENU_CANCEL_SOUND;

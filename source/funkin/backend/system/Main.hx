@@ -183,6 +183,7 @@ class Main extends Sprite
 		FlxG.signals.preStateCreate.add((state) -> {
 			if (state != null) Logs.trace('Creating state: ' + Type.getClassName(Type.getClass(state)), VERBOSE);
 		});
+		applyImmersive();
 		updateMobileFramerateScale();
 		Lib.current.stage.addEventListener(openfl.events.Event.RESIZE, (_) -> updateMobileFramerateScale());
 		Lib.current.stage.addEventListener(openfl.events.MouseEvent.MOUSE_DOWN, (_) -> recoverFocus());
@@ -230,7 +231,17 @@ class Main extends Sprite
 		framerateSprite.scaleX = framerateSprite.scaleY = framerateBaseScale;
 	}
 
+	static function applyImmersive() {
+		#if android
+		try {
+			var method:Dynamic = lime.system.JNI.createStaticMethod("org/codename/mobile/ScreenHelper", "applyImmersive", "()V");
+			if (method != null) method();
+		} catch (_:Dynamic) {}
+		#end
+	}
+
 	static function scheduleScreenRefresh() {
+		applyImmersive();
 		refreshScreen();
 		for (delay in [100, 300, 800, 1500])
 			haxe.Timer.delay(refreshScreen, delay);

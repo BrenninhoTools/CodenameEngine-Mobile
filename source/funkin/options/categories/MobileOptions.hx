@@ -11,6 +11,8 @@ class MobileOptions extends TreeMenuScreen {
 		add(new ArrayOption(getNameID('screenStyle'), getDescID('screenStyle'), ["Original", "Full"], ["Original", "Full"], 'screenStyle', (_) -> funkin.backend.system.FunkinRatioScaleMode.refresh()));
 		add(new ArrayOption(getNameID('hitboxMode'), getDescID('hitboxMode'), funkin.mobile.Hitbox.MODES, funkin.mobile.Hitbox.MODES, 'hitboxMode'));
 		add(new Checkbox(getNameID('invisiblePauseButton'), getDescID('invisiblePauseButton'), 'invisiblePauseButton'));
+		add(new Checkbox(getNameID('haptics'), getDescID('haptics'), 'haptics', () -> funkin.mobile.Haptics.preview()));
+		add(new NumOption(getNameID('hapticsIntensity'), getDescID('hapticsIntensity'), 0, 100, 10, 'hapticsIntensity', (_) -> funkin.mobile.Haptics.preview()));
 		add(new Checkbox(getNameID('antiCrash'), getDescID('antiCrash'), 'antiCrash'));
 		add(new TextOption(getNameID('storageInfo'), getDescID('storageInfo'), () -> {
 			funkin.backend.system.modules.AntiCrash.showNotice('Storage', StorageUtil.getStorageInfo());

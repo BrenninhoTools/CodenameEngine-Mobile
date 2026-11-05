@@ -44,6 +44,8 @@ class Options
 	public static var screenStyle:String = "Original";
 	public static var hitboxMode:String = "Four Lanes";
 	public static var invisiblePauseButton:Bool = false;
+	public static var haptics:Bool = true;
+	public static var hapticsIntensity:Float = 60;
 	@:doNotSave public static var storageType:String = "Data";
 	public static var antialiasing:Bool = true;
 	public static var volume:Float = 1;

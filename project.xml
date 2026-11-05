@@ -137,6 +137,7 @@
 		<config:android permission="android.permission.READ_EXTERNAL_STORAGE"/>
 		<config:android permission="android.permission.WRITE_EXTERNAL_STORAGE"/>
 		<config:android permission="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+		<config:android permission="android.permission.VIBRATE"/>
 		<config:android>
 			<application android:requestLegacyExternalStorage="true"/>
 		</config:android>

@@ -103,7 +103,7 @@ class MainMenuState extends MusicBeatState
 
 		changeItem();
 
-		devModeWarning = new FunkinText(0, FlxG.height - 50, 1280, "You have to enable DEVELOPER MODE in the miscellaneous settings!", 24);
+		devModeWarning = new FunkinText(0, FlxG.height - 50, FlxG.width, "You have to enable DEVELOPER MODE in the miscellaneous settings!", 24);
 		devModeWarning.alignment = CENTER;
 		add(devModeWarning);
 		devModeWarning.scrollFactor.set();

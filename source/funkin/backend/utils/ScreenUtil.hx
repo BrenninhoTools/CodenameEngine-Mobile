@@ -22,6 +22,10 @@ class ScreenUtil
 	public static var extraHeight(get, never):Float;
 	public static var sideOffset(get, never):Float;
 	public static var verticalOffset(get, never):Float;
+	public static var safeLeft(get, never):Float;
+	public static var safeRight(get, never):Float;
+	public static var safeTop(get, never):Float;
+	public static var safeBottom(get, never):Float;
 
 	static inline function get_isFull():Bool
 		return funkin.backend.system.FunkinRatioScaleMode.isFullScreenStyle();
@@ -38,12 +42,56 @@ class ScreenUtil
 	static inline function get_verticalOffset():Float
 		return extraHeight / 2;
 
+	static function insetToGame(inset:Float, horizontal:Bool):Float
+	{
+		if (FlxG.scaleMode == null || FlxG.game == null)
+			return 0;
+		var scale = horizontal ? FlxG.scaleMode.scale.x : FlxG.scaleMode.scale.y;
+		if (scale <= 0 || Math.isNaN(scale))
+			return 0;
+		var border = horizontal ? FlxG.game.x : FlxG.game.y;
+		return Math.max(0, (inset - border) / scale);
+	}
+
+	static function get_safeLeft():Float
+		return #if mobile insetToGame(funkin.backend.system.Main.safeInsetLeft, true) #else 0 #end;
+
+	static function get_safeRight():Float
+		return #if mobile insetToGame(funkin.backend.system.Main.safeInsetRight, true) #else 0 #end;
+
+	static function get_safeTop():Float
+		return #if mobile insetToGame(funkin.backend.system.Main.safeInsetTop, false) #else 0 #end;
+
+	static function get_safeBottom():Float
+		return #if mobile insetToGame(funkin.backend.system.Main.safeInsetBottom, false) #else 0 #end;
+
 	public static function init()
 	{
 		if (registered)
 			return;
 		registered = true;
 		FlxG.signals.postStateSwitch.add(() -> adaptState(FlxG.state));
+		FlxG.signals.gameResized.add((_, _) -> adaptState(FlxG.state));
+	}
+
+	public static function fitStrumX(x:Float, width:Float, absolute:Bool, margin:Float = 12):Float
+	{
+		if (!isFull)
+			return x;
+		if (absolute)
+			x += sideOffset;
+		var minX = safeLeft + margin;
+		var maxX = FlxG.width - safeRight - margin - width;
+		if (maxX < minX)
+			return (minX + FlxG.width - safeRight - margin - width) / 2;
+		return Math.min(Math.max(x, minX), maxX);
+	}
+
+	public static function usableArea():{left:Float, right:Float}
+	{
+		if (!isFull)
+			return {left: 0, right: FlxG.width};
+		return {left: safeLeft, right: FlxG.width - safeRight};
 	}
 
 	public static function adaptState(state:FlxState)

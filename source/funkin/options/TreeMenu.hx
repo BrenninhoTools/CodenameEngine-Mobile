@@ -245,7 +245,12 @@ class TreeMenu extends UIState {
 
 	override function onResize(width:Int, height:Int) {
 		super.onResize(width, height);
+		#if mobile
+		width = FlxG.width;
+		height = FlxG.height;
+		#else
 		if (!UIState.resolutionAware) return;
+		#end
 
 		if (width < FlxG.initialWidth || height < FlxG.initialHeight) {
 			width = FlxG.initialWidth;

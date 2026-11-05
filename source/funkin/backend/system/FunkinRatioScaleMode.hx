@@ -17,12 +17,16 @@ class FunkinRatioScaleMode extends RatioScaleMode {
 			else
 				targetHeight = Math.round(width * Height / Width);
 
+			var oldWidth:Int = FlxG.width;
+			var oldHeight:Int = FlxG.height;
 			@:privateAccess {
 				FlxG.width = targetWidth;
 				FlxG.height = targetHeight;
 			}
 			for (camera in FlxG.cameras.list)
 			{
+				if (camera == null || !isFullCamera(camera, oldWidth, oldHeight))
+					continue;
 				camera.width = targetWidth;
 				camera.height = targetHeight;
 			}
@@ -63,7 +67,7 @@ class FunkinRatioScaleMode extends RatioScaleMode {
 		@:privateAccess {
 
 			for(c in FlxG.cameras.list) {
-				if (c.width == FlxG.width && c.height == FlxG.height) {
+				if (c != null && isFullCamera(c, FlxG.width, FlxG.height)) {
 					c.width = targetWidth;
 					c.height = targetHeight;
 				}
@@ -74,12 +78,16 @@ class FunkinRatioScaleMode extends RatioScaleMode {
 		}
 	}
 
+	static inline function isFullCamera(camera:flixel.FlxCamera, oldWidth:Int, oldHeight:Int):Bool
+		return camera.x == 0 && camera.y == 0 && ((camera.width == oldWidth && camera.height == oldHeight) || (camera.width == FlxG.initialWidth && camera.height == FlxG.initialHeight));
+
 	public static inline function isFullScreenStyle():Bool
 		return #if mobile Options.screenStyle == "Full" #else false #end;
 
 	public static function refresh() {
 		@:privateAccess
 		if (FlxG.game != null) FlxG.game.onResize(null);
+		funkin.backend.utils.ScreenUtil.adaptState(FlxG.state);
 	}
 
 	public function resetSize() {
