@@ -156,7 +156,7 @@ class Note extends FlxSprite
 		this.noteData = noteData.id.getDefault(0);
 
 		var customType = this.noteType != null ? Paths.image('game/notes/${this.noteType}') : null;
-		var event = EventManager.get(NoteCreationEvent).recycle(this, strumID, this.noteType, noteTypeID, PlayState.instance.strumLines.members.indexOf(strumLine), mustPress,
+		var event = EventManager.get(NoteCreationEvent).recycle(this, strumID, this.noteType, noteTypeID, (PlayState.instance != null) ? (PlayState.instance.strumLines.members.indexOf(strumLine)) : strumLine.ID, mustPress,
 			(this.noteType != null && customTypePathExists(customType)) ? 'game/notes/${this.noteType}' : 'game/notes/default', @:privateAccess strumLine.strumScale * Flags.DEFAULT_NOTE_SCALE, animSuffix);
 
 		if (PlayState.instance != null)
@@ -272,8 +272,8 @@ class Note extends FlxSprite
 				__lastStrumHalfH = __strum.height * 0.5;
 			}
 
-			x = -origin.x + offset.x + (originalY * __lastAngleCos) + __strum.x + __lastStrumHalfW;
-			y = -origin.y + offset.y + (originalY * __lastAngleSin) + __strum.y + __lastStrumHalfH;
+			x = -origin.x + offset.x + (originalY * __lastAngleCos + originalX * __lastAngleSin) + __strum.x + __lastStrumHalfW;
+			y = -origin.y + offset.y + (originalY * __lastAngleSin - originalX * __lastAngleCos) + __strum.y + __lastStrumHalfH;
 			super.draw();
 			x = originalX;
 			y = originalY;

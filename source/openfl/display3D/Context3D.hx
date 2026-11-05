@@ -353,9 +353,9 @@ import lime.math.Vector2;
 			#if (js && html5)
 			__glDepthStencil = gl.DEPTH_STENCIL;
 			#else
-			if (__context.type == OPENGLES && Std.parseFloat(__context.version) >= 3)
+			if (Std.parseFloat(__context.version) >= 3)
 			{
-				__glDepthStencil = __context.gles3.DEPTH24_STENCIL8;
+				__glDepthStencil = GL.DEPTH24_STENCIL8;
 			}
 			else
 			{
@@ -1320,21 +1320,12 @@ import lime.math.Vector2;
 
 		__bindGLElementArrayBuffer(indexBuffer.__id);
 
-		if (OpenGLRenderer.__coherentBlendsSupported)
-		{
-			gl.enable(0x9285); // BLEND_ADVANCED_COHERENT_KHR
-		}
-		else if (__usingComplexBlend)
+		if (!OpenGLRenderer.__coherentBlendsSupported && __usingComplexBlend)
 		{
 			gl.blendBarrier();
 		}
 
 		gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, firstIndex * 2);
-
-		if (OpenGLRenderer.__coherentBlendsSupported)
-		{
-			gl.disable(0x9285); // BLEND_ADVANCED_COHERENT_KHR
-		}
 	}
 
 	/**
@@ -2201,21 +2192,12 @@ import lime.math.Vector2;
 			__state.program.__flush();
 		}
 
-		if (OpenGLRenderer.__coherentBlendsSupported)
-		{
-			gl.enable(0x9285); // BLEND_ADVANCED_COHERENT_KHR
-		}
-		else if (__usingComplexBlend)
+		if (!OpenGLRenderer.__coherentBlendsSupported && __usingComplexBlend)
 		{
 			gl.blendBarrier();
 		}
 
 		gl.drawArrays(gl.TRIANGLES, firstIndex, count);
-
-		if (OpenGLRenderer.__coherentBlendsSupported)
-		{
-			gl.disable(0x9285); // BLEND_ADVANCED_COHERENT_KHR
-		}
 	}
 
 	@:noCompletion private function __flushGL():Void
