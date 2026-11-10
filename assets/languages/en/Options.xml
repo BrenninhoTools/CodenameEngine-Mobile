@@ -188,7 +188,13 @@
 		<str id="screenStyle-name">Screen Style</str>
 		<str id="screenStyle-desc">Original keeps the game at 16:9 with black borders. Full expands the game to fill the whole screen without borders or stretching, showing a bit more on the sides. Notes and the HUD stay away from the camera cutout.</str>
 		<str id="hitboxMode-name">Hitbox Mode</str>
-		<str id="hitboxMode-desc">Four Lanes splits the screen into one lane per arrow. Arrows uses your strums as big buttons at the bottom of the screen and hides the opponent's strums and notes.</str>
+		<str id="hitboxMode-desc">Four Lanes splits the screen into one lane per arrow. Triangle splits it into four triangles pointing to each side. Arrows uses your strums as big buttons and hides the opponent's strums. The D-Pad modes show arrow buttons in the corners. Modes other than Four Lanes and Arrows need songs with four keys.</str>
+		<str id="hitboxStyle-name">Hitbox Style</str>
+		<str id="hitboxStyle-desc">How the hitbox looks when you touch it: Gradient, Solid, Outline, Bottom Glow, Edges, Rounded, Neon, Arrows or Corners.</str>
+		<str id="hitboxColors-name">Hitbox Colors</str>
+		<str id="hitboxColors-desc">The colors of the hitbox lanes and buttons. Classic uses the default note colors.</str>
+		<str id="hitboxHint-name">Hitbox Hint</str>
+		<str id="hitboxHint-desc">If checked, the hitbox lanes are faintly visible even when you are not touching them.</str>
 		<str id="invisiblePauseButton-name">Invisible Pause Button</str>
 		<str id="invisiblePauseButton-desc">If checked, the pause button will be invisible during songs, but you can still tap it to pause.</str>
 		<str id="haptics-name">Haptics</str>

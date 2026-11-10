@@ -43,6 +43,9 @@ class Options
 	public static var hitboxOpacity:Float = 25;
 	public static var screenStyle:String = "Original";
 	public static var hitboxMode:String = "Four Lanes";
+	public static var hitboxStyle:String = "Gradient";
+	public static var hitboxColors:String = "Classic";
+	public static var hitboxHint:Bool = false;
 	public static var invisiblePauseButton:Bool = false;
 	public static var haptics:Bool = true;
 	public static var hapticsIntensity:Float = 60;

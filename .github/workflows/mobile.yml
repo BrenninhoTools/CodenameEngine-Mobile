@@ -2,6 +2,10 @@ name: Mobile Builds
 
 on:
   push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
     paths-ignore:
       - '**.md'
       - 'art/**'
@@ -16,23 +20,100 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
       - 'LICENSE'
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: Platforms to build
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+        default: all
+      build_type:
+        description: Build type
+        type: choice
+        options:
+          - release
+          - debug
+        default: release
+      rebuild_libraries:
+        description: Ignore the library cache and rebuild Lime and Hxcpp
+        type: boolean
+        default: false
+      clear_compile_cache:
+        description: Start without the Hxcpp compile cache
+        type: boolean
+        default: false
+      publish_release:
+        description: Publish the builds as a GitHub prerelease
+        type: boolean
+        default: false
 
 concurrency:
   group: mobile-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
 
 env:
   HAXE_VERSION: 4.3.7
   NDK_VERSION: r27c
-  LIBS_CACHE_VERSION: v6
+  LIBS_CACHE_VERSION: v7
   HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
   GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false
+  BUILD_TYPE: ${{ inputs.build_type || 'release' }}
 
 jobs:
+  prepare:
+    name: Preparing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      android: ${{ steps.plan.outputs.android }}
+      ios: ${{ steps.plan.outputs.ios }}
+      version: ${{ steps.plan.outputs.version }}
+      suffix: ${{ steps.plan.outputs.suffix }}
+      release: ${{ steps.plan.outputs.release }}
+    steps:
+      - name: Pulling the project file
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: project.xml
+          sparse-checkout-cone-mode: false
+
+      - name: Planning the build
+        id: plan
+        run: |
+          PLATFORMS="${{ inputs.platforms || 'all' }}"
+          [ "$PLATFORMS" = "all" ] || [ "$PLATFORMS" = "android" ] && echo "android=true" >> $GITHUB_OUTPUT || echo "android=false" >> $GITHUB_OUTPUT
+          [ "$PLATFORMS" = "all" ] || [ "$PLATFORMS" = "ios" ] && echo "ios=true" >> $GITHUB_OUTPUT || echo "ios=false" >> $GITHUB_OUTPUT
+          VERSION=$(grep -v '^<?xml' project.xml | grep -oP '\bversion="\K[^"]+' | head -n 1)
+          [ -n "$VERSION" ] || VERSION=unknown
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "suffix=$VERSION-$SHORT_SHA${{ env.BUILD_TYPE == 'debug' && '-debug' || '' }}" >> $GITHUB_OUTPUT
+          if [[ "${{ github.ref }}" == refs/tags/v* ]] || [ "${{ inputs.publish_release }}" = "true" ]; then
+            echo "release=true" >> $GITHUB_OUTPUT
+          else
+            echo "release=false" >> $GITHUB_OUTPUT
+          fi
+          {
+            echo "### Build plan"
+            echo "| Setting | Value |"
+            echo "| --- | --- |"
+            echo "| Version | \`$VERSION\` |"
+            echo "| Commit | \`$SHORT_SHA\` |"
+            echo "| Platforms | $PLATFORMS |"
+            echo "| Build type | ${{ env.BUILD_TYPE }} |"
+          } >> $GITHUB_STEP_SUMMARY
+
   android:
     name: Android Build (ARM64)
-    permissions: write-all
+    needs: prepare
+    if: needs.prepare.outputs.android == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 120
     steps:
       - name: Pulling the new commit
         uses: actions/checkout@v7
@@ -77,17 +158,19 @@ jobs:
 
       - name: Restoring libraries
         id: libs-cache
+        if: ${{ !inputs.rebuild_libraries }}
         uses: actions/cache/restore@v6
         with:
           path: .haxelib
-          key: libs-android-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml') }}
+          key: libs-android-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
 
       - name: Restoring compile cache
-        uses: actions/cache@v6
+        if: ${{ !inputs.clear_compile_cache }}
+        uses: actions/cache/restore@v6
         with:
           path: .hxcpp_cache
-          key: hxcpp-android-${{ github.run_id }}
-          restore-keys: hxcpp-android-
+          key: hxcpp-android-${{ env.BUILD_TYPE }}-${{ github.run_id }}
+          restore-keys: hxcpp-android-${{ env.BUILD_TYPE }}-
 
       - name: Restoring Gradle cache
         uses: actions/cache@v6
@@ -149,11 +232,11 @@ jobs:
           haxelib run lime rebuild android -release -nocolor -arm64
 
       - name: Saving libraries
-        if: steps.libs-cache.outputs.cache-hit != 'true'
+        if: steps.libs-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request'
         uses: actions/cache/save@v6
         with:
           path: .haxelib
-          key: ${{ steps.libs-cache.outputs.cache-primary-key }}
+          key: libs-${{ github.job }}-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
 
       - name: Removing stale precompiled headers
         run: |
@@ -181,7 +264,14 @@ jobs:
           EOF
 
       - name: Building the game
-        run: haxelib run lime build android -release -arm64 -DCOMPILE_EXPERIMENTAL
+        run: haxelib run lime build android -${{ env.BUILD_TYPE }} -arm64 -DCOMPILE_EXPERIMENTAL
+
+      - name: Saving compile cache
+        if: always() && github.event_name != 'pull_request' && !cancelled()
+        uses: actions/cache/save@v6
+        with:
+          path: .hxcpp_cache
+          key: hxcpp-android-${{ env.BUILD_TYPE }}-${{ github.run_id }}
 
       - name: Signing the APK
         env:
@@ -191,7 +281,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
-          UNSIGNED=$(find export/release/android/bin -name "*.apk" | head -n 1)
+          UNSIGNED=$(find export/${{ env.BUILD_TYPE }}/android/bin -name "*.apk" | head -n 1)
           if [ -z "$UNSIGNED" ]; then
             echo "No APK was generated."
             exit 1
@@ -212,19 +302,42 @@ jobs:
             --key-pass pass:$KEY_PASSWORD --out build/CodenameEngine-arm64.apk build/aligned.apk
           $BUILD_TOOLS/apksigner verify build/CodenameEngine-arm64.apk
           rm -f keystore.jks build/aligned.apk
+          SIZE=$(du -h build/CodenameEngine-arm64.apk | cut -f1)
+          SHA=$(sha256sum build/CodenameEngine-arm64.apk | cut -d' ' -f1)
+          {
+            echo "### Android (ARM64)"
+            echo "| File | Size | SHA-256 |"
+            echo "| --- | --- | --- |"
+            echo "| CodenameEngine-arm64.apk | $SIZE | \`$SHA\` |"
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Uploading artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Codename Engine Android (ARM64)
+          name: CodenameEngine-Android-${{ needs.prepare.outputs.suffix }}
           path: build/CodenameEngine-arm64.apk
           if-no-files-found: error
           compression-level: 0
+          retention-days: 30
+
+      - name: Uploading logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-logs-${{ github.run_id }}
+          path: |
+            export/*/android/bin/app/build/reports/**
+            export/*/android/bin/app/build/outputs/logs/**
+            export/*/android/haxe/*.log
+          if-no-files-found: ignore
+          retention-days: 7
 
   ios:
     name: iOS Build
-    permissions: write-all
+    needs: prepare
+    if: needs.prepare.outputs.ios == 'true'
     runs-on: macos-26
+    timeout-minutes: 120
     steps:
       - name: Pulling the new commit
         uses: actions/checkout@v7
@@ -242,17 +355,19 @@ jobs:
 
       - name: Restoring libraries
         id: libs-cache
+        if: ${{ !inputs.rebuild_libraries }}
         uses: actions/cache/restore@v6
         with:
           path: .haxelib
-          key: libs-ios-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml') }}
+          key: libs-ios-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
 
       - name: Restoring compile cache
-        uses: actions/cache@v6
+        if: ${{ !inputs.clear_compile_cache }}
+        uses: actions/cache/restore@v6
         with:
           path: .hxcpp_cache
-          key: hxcpp-ios-${{ github.run_id }}
-          restore-keys: hxcpp-ios-
+          key: hxcpp-ios-${{ env.BUILD_TYPE }}-${{ github.run_id }}
+          restore-keys: hxcpp-ios-${{ env.BUILD_TYPE }}-
 
       - name: Updating haxelib
         run: haxelib --global update haxelib
@@ -272,11 +387,11 @@ jobs:
           haxelib run lime rebuild ios -release -nocolor
 
       - name: Saving libraries
-        if: steps.libs-cache.outputs.cache-hit != 'true'
+        if: steps.libs-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request'
         uses: actions/cache/save@v6
         with:
           path: .haxelib
-          key: ${{ steps.libs-cache.outputs.cache-primary-key }}
+          key: libs-${{ github.job }}-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
 
       - name: Removing stale precompiled headers
         run: |
@@ -285,11 +400,18 @@ jobs:
           fi
 
       - name: Building the game
-        run: haxelib run lime build ios -release -nosign -DCOMPILE_EXPERIMENTAL
+        run: haxelib run lime build ios -${{ env.BUILD_TYPE }} -nosign -DCOMPILE_EXPERIMENTAL
+
+      - name: Saving compile cache
+        if: always() && github.event_name != 'pull_request' && !cancelled()
+        uses: actions/cache/save@v6
+        with:
+          path: .hxcpp_cache
+          key: hxcpp-ios-${{ env.BUILD_TYPE }}-${{ github.run_id }}
 
       - name: Packaging the IPA
         run: |
-          APP=$(find export/release/ios/build -name "*.app" -type d | grep -i "iphoneos" | head -n 1)
+          APP=$(find export/${{ env.BUILD_TYPE }}/ios/build -name "*.app" -type d | grep -i "iphoneos" | head -n 1)
           if [ -z "$APP" ]; then
             echo "No .app bundle was generated."
             exit 1
@@ -298,11 +420,49 @@ jobs:
           cp -R "$APP" build/Payload/
           cd build
           zip -qr CodenameEngine.ipa Payload
+          SIZE=$(du -h CodenameEngine.ipa | cut -f1)
+          SHA=$(shasum -a 256 CodenameEngine.ipa | cut -d' ' -f1)
+          {
+            echo "### iOS"
+            echo "| File | Size | SHA-256 |"
+            echo "| --- | --- | --- |"
+            echo "| CodenameEngine.ipa | $SIZE | \`$SHA\` |"
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Uploading artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Codename Engine iOS
+          name: CodenameEngine-iOS-${{ needs.prepare.outputs.suffix }}
           path: build/CodenameEngine.ipa
           if-no-files-found: error
           compression-level: 0
+          retention-days: 30
+
+  release:
+    name: Publishing Release
+    needs: [prepare, android, ios]
+    if: always() && needs.prepare.outputs.release == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Downloading builds
+        uses: actions/download-artifact@v8
+        with:
+          pattern: CodenameEngine-*
+          path: release
+          merge-multiple: true
+
+      - name: Publishing
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', needs.prepare.outputs.suffix) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Codename Engine Mobile {0}', needs.prepare.outputs.suffix) }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          files: |
+            release/*.apk
+            release/*.ipa
