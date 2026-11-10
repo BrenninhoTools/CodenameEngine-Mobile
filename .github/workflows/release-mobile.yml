@@ -1,0 +1,499 @@
+name: Mobile Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example v1.1.0-mobile.1 (empty uses the version and commit)
+        type: string
+        default: ''
+      title:
+        description: Release title (empty uses the tag)
+        type: string
+        default: ''
+      notes:
+        description: Extra release notes shown above the generated changelog
+        type: string
+        default: ''
+      platforms:
+        description: Platforms to build
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+        default: all
+      build_type:
+        description: Build type
+        type: choice
+        options:
+          - release
+          - debug
+        default: release
+      prerelease:
+        description: Mark as prerelease
+        type: boolean
+        default: false
+      draft:
+        description: Save as a draft instead of publishing
+        type: boolean
+        default: false
+      rebuild_libraries:
+        description: Ignore the library cache and rebuild Lime and Hxcpp
+        type: boolean
+        default: false
+      clear_compile_cache:
+        description: Start without the Hxcpp compile cache
+        type: boolean
+        default: false
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  HAXE_VERSION: 4.3.7
+  NDK_VERSION: r27c
+  LIBS_CACHE_VERSION: v7
+  HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
+  GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false
+  BUILD_TYPE: ${{ inputs.build_type || 'release' }}
+
+jobs:
+  prepare:
+    name: Preparing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      android: ${{ steps.plan.outputs.android }}
+      ios: ${{ steps.plan.outputs.ios }}
+      version: ${{ steps.plan.outputs.version }}
+      suffix: ${{ steps.plan.outputs.suffix }}
+      tag: ${{ steps.plan.outputs.tag }}
+      title: ${{ steps.plan.outputs.title }}
+    steps:
+      - name: Pulling the project file
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: project.xml
+          sparse-checkout-cone-mode: false
+
+      - name: Planning the build
+        id: plan
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_TITLE: ${{ inputs.title }}
+        run: |
+          PLATFORMS="${{ inputs.platforms || 'all' }}"
+          [ "$PLATFORMS" = "all" ] || [ "$PLATFORMS" = "android" ] && echo "android=true" >> $GITHUB_OUTPUT || echo "android=false" >> $GITHUB_OUTPUT
+          [ "$PLATFORMS" = "all" ] || [ "$PLATFORMS" = "ios" ] && echo "ios=true" >> $GITHUB_OUTPUT || echo "ios=false" >> $GITHUB_OUTPUT
+          VERSION=$(grep -v '^<?xml' project.xml | grep -oP '\bversion="\K[^"]+' | head -n 1)
+          [ -n "$VERSION" ] || VERSION=unknown
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "suffix=$VERSION-$SHORT_SHA${{ env.BUILD_TYPE == 'debug' && '-debug' || '' }}" >> $GITHUB_OUTPUT
+          TAG="$INPUT_TAG"
+          [ -n "$TAG" ] || TAG="v$VERSION-mobile-$SHORT_SHA"
+          if ! git check-ref-format "refs/tags/$TAG"; then
+            echo "::error::'$TAG' is not a valid tag name."
+            exit 1
+          fi
+          TITLE="$INPUT_TITLE"
+          [ -n "$TITLE" ] || TITLE="Codename Engine Mobile $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+          {
+            echo "### Build plan"
+            echo "| Setting | Value |"
+            echo "| --- | --- |"
+            echo "| Version | \`$VERSION\` |"
+            echo "| Commit | \`$SHORT_SHA\` |"
+            echo "| Platforms | $PLATFORMS |"
+            echo "| Build type | ${{ env.BUILD_TYPE }} |"
+            echo "| Tag | \`$TAG\` |"
+          } >> $GITHUB_STEP_SUMMARY
+
+  android:
+    name: Android Build (ARM64)
+    needs: prepare
+    if: needs.prepare.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Pulling the new commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Setting up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - name: Finding a preinstalled Android NDK
+        id: find-ndk
+        run: |
+          for dir in $(ls -d $ANDROID_HOME/ndk/27.* 2>/dev/null | sort -V -r); do
+            if [ -x "$dir/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" ]; then
+              echo "Using preinstalled NDK $dir"
+              echo "path=$dir" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "No preinstalled NDK 27 found, downloading ${{ env.NDK_VERSION }}"
+
+      - name: Setting up Android NDK
+        id: setup-ndk
+        if: steps.find-ndk.outputs.path == ''
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: false
+          local-cache: true
+
+      - name: Setting up Haxe
+        uses: krdlab/setup-haxe@v2
+        with:
+          haxe-version: ${{ env.HAXE_VERSION }}
+
+      - name: Using every CPU core
+        run: echo "HXCPP_COMPILE_THREADS=$(nproc)" >> $GITHUB_ENV
+
+      - name: Restoring libraries
+        id: libs-cache
+        if: ${{ !inputs.rebuild_libraries }}
+        uses: actions/cache/restore@v6
+        with:
+          path: .haxelib
+          key: libs-android-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
+
+      - name: Restoring compile cache
+        if: ${{ !inputs.clear_compile_cache }}
+        uses: actions/cache/restore@v6
+        with:
+          path: .hxcpp_cache
+          key: hxcpp-android-${{ env.BUILD_TYPE }}-${{ github.run_id }}
+          restore-keys: hxcpp-android-${{ env.BUILD_TYPE }}-
+
+      - name: Restoring Gradle cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-android-${{ hashFiles('project.xml', 'android/**') }}
+          restore-keys: gradle-android-
+
+      - name: Updating haxelib
+        run: haxelib --global update haxelib
+
+      - name: Installing libraries
+        if: steps.libs-cache.outputs.cache-hit != 'true'
+        run: |
+          haxe -cp commandline -D analyzer-optimize --run Main setup -si
+          bash building/patch-lime-mobile.sh
+
+      - name: Configuring Lime for Android
+        run: |
+          NDK="${{ steps.find-ndk.outputs.path }}"
+          if [ -z "$NDK" ]; then NDK="${{ steps.setup-ndk.outputs.ndk-path }}"; fi
+          echo "ANDROID_NDK_ROOT=$NDK" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$NDK" >> $GITHUB_ENV
+          echo "ANDROID_HOST=linux-x86_64" >> $GITHUB_ENV
+          echo "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+          ls $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++
+          haxelib run lime config ANDROID_SDK $ANDROID_HOME -nocffi
+          haxelib run lime config ANDROID_NDK_ROOT $NDK -nocffi
+          haxelib run lime config JAVA_HOME $JAVA_HOME -nocffi
+          haxelib run lime config ANDROID_SETUP true -nocffi
+
+      - name: Installing packages for building Lime
+        if: steps.libs-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -qq \
+          libegl1-mesa-dev libgl1-mesa-dev libibus-1.0-dev libdbus-1-dev libdecor-0-dev libudev-dev libgbm-dev libdrm-dev \
+          libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libglu1-mesa-dev libmbedtls-dev libuv1-dev libsqlite3-dev \
+          libx11-dev libxext-dev libxfixes-dev libxi-dev libxinerama-dev libxkbcommon-dev libxcursor-dev libxrandr-dev libxss-dev libxt-dev libxtst-dev libxv-dev libxxf86vm-dev \
+          libpulse-dev libasound2-dev libpipewire-0.3-dev libwayland-dev libwayland-bin wayland-protocols
+
+      - name: Rebuilding Lime and Hxcpp
+        if: steps.libs-cache.outputs.cache-hit != 'true'
+        run: |
+          haxelib run lime rebuild hxcpp -nocffi
+          LIME_PROJECT="$(haxelib libpath lime)/project"
+          PROTOCOLS="$LIME_PROJECT/lib/sdl/wayland-protocols"
+          GENERATED="$LIME_PROJECT/lib/sdl/wayland-generated-protocols"
+          mkdir -p "$GENERATED"
+          for xml in "$PROTOCOLS"/*.xml; do
+            name="$(basename "$xml" .xml)-client-protocol"
+            wayland-scanner client-header "$xml" "$GENERATED/$name.h"
+            wayland-scanner private-code "$xml" "$GENERATED/$name.c"
+          done
+          haxelib run lime rebuild linux -64 -release -nocolor -nocffi
+          haxelib run lime rebuild tools
+          haxelib run lime rebuild android -release -nocolor -arm64
+
+      - name: Saving libraries
+        if: steps.libs-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request'
+        uses: actions/cache/save@v6
+        with:
+          path: .haxelib
+          key: libs-${{ github.job }}-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
+
+      - name: Removing stale precompiled headers
+        run: |
+          if [ -d .hxcpp_cache ]; then
+            find .hxcpp_cache -type d -name "pch*" -prune -exec rm -rf {} +
+          fi
+
+      - name: Configuring Gradle for faster builds
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/fast-build.gradle <<'EOF'
+          allprojects {
+              tasks.configureEach { task ->
+                  if (task.name.startsWith('lintVital') || task.name.startsWith('lintAnalyze') || task.name.startsWith('generateReleaseLintVital'))
+                      task.enabled = false
+              }
+              afterEvaluate { project ->
+                  def android = project.extensions.findByName('android')
+                  if (android != null) {
+                      try { android.lint.checkReleaseBuilds = false } catch (ignored) {}
+                      try { android.androidResources.noCompress.addAll(['.png', '.ogg', '.mp3', '.wav', '.ttf', '.otf', '.xml', '.json', '.txt', '.hx', '.hscript', '.frag', '.vert', '.lua', '.ini', '.csv', '.mp4', '.webm', '.zip', '.version']) } catch (ignored) {}
+                  }
+              }
+          }
+          EOF
+
+      - name: Building the game
+        run: haxelib run lime build android -${{ env.BUILD_TYPE }} -arm64 -DCOMPILE_EXPERIMENTAL
+
+      - name: Saving compile cache
+        if: always() && github.event_name != 'pull_request' && !cancelled()
+        uses: actions/cache/save@v6
+        with:
+          path: .hxcpp_cache
+          key: hxcpp-android-${{ env.BUILD_TYPE }}-${{ github.run_id }}
+
+      - name: Signing the APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          UNSIGNED=$(find export/${{ env.BUILD_TYPE }}/android/bin -name "*.apk" | head -n 1)
+          if [ -z "$UNSIGNED" ]; then
+            echo "No APK was generated."
+            exit 1
+          fi
+
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
+          else
+            KEYSTORE_PASSWORD=codename
+            KEY_ALIAS=codename
+            KEY_PASSWORD=codename
+            cp building/codename-mobile.keystore keystore.jks
+          fi
+
+          mkdir -p build
+          $BUILD_TOOLS/zipalign -f -p 4 "$UNSIGNED" build/aligned.apk
+          $BUILD_TOOLS/apksigner sign --ks keystore.jks --ks-pass pass:$KEYSTORE_PASSWORD --ks-key-alias $KEY_ALIAS \
+            --key-pass pass:$KEY_PASSWORD --out build/CodenameEngine-arm64.apk build/aligned.apk
+          $BUILD_TOOLS/apksigner verify build/CodenameEngine-arm64.apk
+          rm -f keystore.jks build/aligned.apk
+          SIZE=$(du -h build/CodenameEngine-arm64.apk | cut -f1)
+          SHA=$(sha256sum build/CodenameEngine-arm64.apk | cut -d' ' -f1)
+          {
+            echo "### Android (ARM64)"
+            echo "| File | Size | SHA-256 |"
+            echo "| --- | --- | --- |"
+            echo "| CodenameEngine-arm64.apk | $SIZE | \`$SHA\` |"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Uploading artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: CodenameEngine-Android-${{ needs.prepare.outputs.suffix }}
+          path: build/CodenameEngine-arm64.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Uploading logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-logs-${{ github.run_id }}
+          path: |
+            export/*/android/bin/app/build/reports/**
+            export/*/android/bin/app/build/outputs/logs/**
+            export/*/android/haxe/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  ios:
+    name: iOS Build
+    needs: prepare
+    if: needs.prepare.outputs.ios == 'true'
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - name: Pulling the new commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Setting up Haxe
+        uses: krdlab/setup-haxe@v2
+        with:
+          haxe-version: ${{ env.HAXE_VERSION }}
+
+      - name: Using every CPU core
+        run: echo "HXCPP_COMPILE_THREADS=$(sysctl -n hw.ncpu)" >> $GITHUB_ENV
+
+      - name: Restoring libraries
+        id: libs-cache
+        if: ${{ !inputs.rebuild_libraries }}
+        uses: actions/cache/restore@v6
+        with:
+          path: .haxelib
+          key: libs-ios-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
+
+      - name: Restoring compile cache
+        if: ${{ !inputs.clear_compile_cache }}
+        uses: actions/cache/restore@v6
+        with:
+          path: .hxcpp_cache
+          key: hxcpp-ios-${{ env.BUILD_TYPE }}-${{ github.run_id }}
+          restore-keys: hxcpp-ios-${{ env.BUILD_TYPE }}-
+
+      - name: Updating haxelib
+        run: haxelib --global update haxelib
+
+      - name: Installing libraries
+        if: steps.libs-cache.outputs.cache-hit != 'true'
+        run: |
+          haxe -cp commandline -D analyzer-optimize --run Main setup -si
+          bash building/patch-lime-mobile.sh
+
+      - name: Rebuilding Lime and Hxcpp
+        if: steps.libs-cache.outputs.cache-hit != 'true'
+        run: |
+          haxelib run lime rebuild hxcpp -nocffi
+          haxelib run lime rebuild mac -release -nocolor -nocffi
+          haxelib run lime rebuild tools
+          haxelib run lime rebuild ios -release -nocolor
+
+      - name: Saving libraries
+        if: steps.libs-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request'
+        uses: actions/cache/save@v6
+        with:
+          path: .haxelib
+          key: libs-${{ github.job }}-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
+
+      - name: Removing stale precompiled headers
+        run: |
+          if [ -d .hxcpp_cache ]; then
+            find .hxcpp_cache -type d -name "pch*" -prune -exec rm -rf {} +
+          fi
+
+      - name: Building the game
+        run: haxelib run lime build ios -${{ env.BUILD_TYPE }} -nosign -DCOMPILE_EXPERIMENTAL
+
+      - name: Saving compile cache
+        if: always() && github.event_name != 'pull_request' && !cancelled()
+        uses: actions/cache/save@v6
+        with:
+          path: .hxcpp_cache
+          key: hxcpp-ios-${{ env.BUILD_TYPE }}-${{ github.run_id }}
+
+      - name: Packaging the IPA
+        run: |
+          APP=$(find export/${{ env.BUILD_TYPE }}/ios/build -name "*.app" -type d | grep -i "iphoneos" | head -n 1)
+          if [ -z "$APP" ]; then
+            echo "No .app bundle was generated."
+            exit 1
+          fi
+          mkdir -p build/Payload
+          cp -R "$APP" build/Payload/
+          cd build
+          zip -qr CodenameEngine.ipa Payload
+          SIZE=$(du -h CodenameEngine.ipa | cut -f1)
+          SHA=$(shasum -a 256 CodenameEngine.ipa | cut -d' ' -f1)
+          {
+            echo "### iOS"
+            echo "| File | Size | SHA-256 |"
+            echo "| --- | --- | --- |"
+            echo "| CodenameEngine.ipa | $SIZE | \`$SHA\` |"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Uploading artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: CodenameEngine-iOS-${{ needs.prepare.outputs.suffix }}
+          path: build/CodenameEngine.ipa
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  release:
+    name: Publishing Release
+    needs: [prepare, android, ios]
+    if: always() && needs.prepare.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Downloading builds
+        uses: actions/download-artifact@v8
+        with:
+          pattern: CodenameEngine-*
+          path: release
+          merge-multiple: true
+
+      - name: Checking builds
+        run: |
+          ls -la release
+          if [ -z "$(ls release/*.apk release/*.ipa 2>/dev/null)" ]; then
+            echo "::error::No builds were found to publish."
+            exit 1
+          fi
+          mv release/CodenameEngine-arm64.apk "release/CodenameEngine-${{ needs.prepare.outputs.tag }}-arm64.apk" 2>/dev/null || true
+          mv release/CodenameEngine.ipa "release/CodenameEngine-${{ needs.prepare.outputs.tag }}.ipa" 2>/dev/null || true
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publishing
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: ${{ needs.prepare.outputs.title }}
+          body: ${{ inputs.notes }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ inputs.prerelease }}
+          draft: ${{ inputs.draft }}
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          files: |
+            release/*.apk
+            release/*.ipa
+            release/SHA256SUMS.txt
+
+      - name: Writing summary
+        run: |
+          {
+            echo "### Release"
+            echo "Published \`${{ needs.prepare.outputs.tag }}\` (${{ inputs.draft && 'draft' || (inputs.prerelease && 'prerelease' || 'release') }})."
+          } >> $GITHUB_STEP_SUMMARY

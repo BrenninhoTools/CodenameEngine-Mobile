@@ -2,10 +2,6 @@ name: Mobile Builds
 
 on:
   push:
-    branches:
-      - '**'
-    tags:
-      - 'v*'
     paths-ignore:
       - '**.md'
       - 'art/**'
@@ -44,14 +40,10 @@ on:
         description: Start without the Hxcpp compile cache
         type: boolean
         default: false
-      publish_release:
-        description: Publish the builds as a GitHub prerelease
-        type: boolean
-        default: false
 
 concurrency:
   group: mobile-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -74,7 +66,6 @@ jobs:
       ios: ${{ steps.plan.outputs.ios }}
       version: ${{ steps.plan.outputs.version }}
       suffix: ${{ steps.plan.outputs.suffix }}
-      release: ${{ steps.plan.outputs.release }}
     steps:
       - name: Pulling the project file
         uses: actions/checkout@v7
@@ -93,11 +84,6 @@ jobs:
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "suffix=$VERSION-$SHORT_SHA${{ env.BUILD_TYPE == 'debug' && '-debug' || '' }}" >> $GITHUB_OUTPUT
-          if [[ "${{ github.ref }}" == refs/tags/v* ]] || [ "${{ inputs.publish_release }}" = "true" ]; then
-            echo "release=true" >> $GITHUB_OUTPUT
-          else
-            echo "release=false" >> $GITHUB_OUTPUT
-          fi
           {
             echo "### Build plan"
             echo "| Setting | Value |"
@@ -438,31 +424,3 @@ jobs:
           compression-level: 0
           retention-days: 30
 
-  release:
-    name: Publishing Release
-    needs: [prepare, android, ios]
-    if: always() && needs.prepare.outputs.release == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    steps:
-      - name: Downloading builds
-        uses: actions/download-artifact@v8
-        with:
-          pattern: CodenameEngine-*
-          path: release
-          merge-multiple: true
-
-      - name: Publishing
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', needs.prepare.outputs.suffix) }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Codename Engine Mobile {0}', needs.prepare.outputs.suffix) }}
-          target_commitish: ${{ github.sha }}
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          generate_release_notes: true
-          fail_on_unmatched_files: false
-          files: |
-            release/*.apk
-            release/*.ipa
