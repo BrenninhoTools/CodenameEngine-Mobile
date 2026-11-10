@@ -188,7 +188,7 @@
 		<str id="screenStyle-name">Screen Style</str>
 		<str id="screenStyle-desc">Original keeps the game at 16:9 with black borders. Full expands the game to fill the whole screen without borders or stretching, showing a bit more on the sides. Notes and the HUD stay away from the camera cutout.</str>
 		<str id="hitboxMode-name">Hitbox Mode</str>
-		<str id="hitboxMode-desc">Four Lanes splits the screen into one lane per arrow. Triangle splits it into four triangles pointing to each side. Arrows uses your strums as big buttons and hides the opponent's strums. The D-Pad modes show arrow buttons in the corners. Modes other than Four Lanes and Arrows need songs with four keys.</str>
+		<str id="hitboxMode-desc">Four Lanes splits the screen into one lane per arrow. Triangle splits it into four triangles pointing to each side. Arrows uses your strums as big buttons, raises them a bit and shows the opponent's strums small in the top left without notes. The D-Pad modes show arrow buttons in the corners. Modes other than Four Lanes and Arrows need songs with four keys.</str>
 		<str id="hitboxStyle-name">Hitbox Style</str>
 		<str id="hitboxStyle-desc">How the hitbox looks when you touch it: Gradient, Solid, Outline, Bottom Glow, Edges, Rounded, Neon, Arrows or Corners.</str>
 		<str id="hitboxColors-name">Hitbox Colors</str>

@@ -63,6 +63,8 @@ class Hitbox extends FlxTypedGroup<FlxSprite>
 
 	public static var ARROWS_SCALE:Float = 1.25;
 	public static var ARROWS_SPREAD:Float = 0.8;
+	public static var ARROWS_RAISE:Float = 70;
+	public static var OPPONENT_SCALE:Float = 0.45;
 
 	public static var laneColors:Array<FlxColor> = [0xFFC24B99, 0xFF00FFFF, 0xFF12FA05, 0xFFF9393F];
 	static var pastelColors:Array<FlxColor> = [0xFFE7A6F2, 0xFFA6E9F2, 0xFFB8F2A6, 0xFFF2A6AC];
@@ -418,7 +420,7 @@ class Hitbox extends FlxTypedGroup<FlxSprite>
 
 	function idleAlphaFor(zone:HitboxZone):Float
 	{
-		if (Options.invisibleHitbox)
+		if (Options.invisibleHitbox || mode == MODE_ARROWS)
 			return 0;
 		var opacity = Options.hitboxOpacity / 100;
 		if (!zone.tinted)
@@ -428,7 +430,7 @@ class Hitbox extends FlxTypedGroup<FlxSprite>
 
 	function pressedAlphaFor(zone:HitboxZone):Float
 	{
-		if (Options.invisibleHitbox)
+		if (Options.invisibleHitbox || mode == MODE_ARROWS)
 			return 0;
 		var opacity = Options.hitboxOpacity / 100;
 		return zone.tinted ? opacity : Math.min(1, Math.max(opacity, 0.35) * 1.6);
