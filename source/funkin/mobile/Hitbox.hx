@@ -63,7 +63,9 @@ class Hitbox extends FlxTypedGroup<FlxSprite>
 
 	public static var ARROWS_SCALE:Float = 1.25;
 	public static var ARROWS_SPREAD:Float = 0.8;
-	public static var ARROWS_RAISE:Float = 70;
+	public static var ARROWS_RAISE:Float = 35;
+	public static var ARROWS_BAND:Float = 1.1;
+	public static var STICKY_SLACK:Float = 18;
 	public static var OPPONENT_SCALE:Float = 0.45;
 
 	public static var laneColors:Array<FlxColor> = [0xFFC24B99, 0xFF00FFFF, 0xFF12FA05, 0xFFF9393F];
@@ -93,6 +95,7 @@ class Hitbox extends FlxTypedGroup<FlxSprite>
 	var pressedZones:Map<HitboxZone, Bool> = new Map();
 
 	var touchZones:Map<Int, HitboxZone> = new Map();
+	var blockedTouches:Map<Int, Bool> = new Map();
 
 	var lastFrame:Int = -1;
 	var updateFrame:Int = 0;
@@ -317,6 +320,9 @@ class Hitbox extends FlxTypedGroup<FlxSprite>
 
 		world.put();
 		touchZones = currentZones;
+		for (id in [for (key in blockedTouches.keys()) key])
+			if (!currentZones.exists(id))
+				blockedTouches.remove(id);
 
 		for (i in 0...keyCount)
 		{
@@ -329,21 +335,56 @@ class Hitbox extends FlxTypedGroup<FlxSprite>
 
 	function processPointer(id:Int, x:Float, y:Float, worldX:Float, worldY:Float, justPressed:Bool, currentZones:Map<Int, HitboxZone>)
 	{
+		if (justPressed)
+			blockedTouches.remove(id);
+		if (blockedTouches.exists(id))
+		{
+			currentZones.set(id, null);
+			return;
+		}
 		for (button in MobileButton.instances)
 			if (button.containsScreenPoint(x, y))
+			{
+				if (justPressed)
+				{
+					blockedTouches.set(id, true);
+					currentZones.set(id, null);
+				}
 				return;
+			}
 
-		var zone = mode == MODE_ARROWS ? getArrowZone(worldX, worldY) : getZoneAt(x, y);
+		var previous = touchZones.get(id);
+		var zone:HitboxZone = null;
+		if (previous != null && !justPressed && stillInside(previous, x, y, worldX, worldY))
+			zone = previous;
+		else
+			zone = mode == MODE_ARROWS ? getArrowZone(worldX, worldY) : getZoneAt(x, y);
 		if (zone == null || zone.lane < 0 || zone.lane >= keyCount)
 			return;
 
 		var lane = zone.lane;
-		var previous = touchZones.get(id);
 		pressedLanes[lane] = true;
 		pressedZones.set(zone, true);
-		if ((justPressed || previous == null || previous.lane != lane) && !lastPressedLanes[lane])
+		if (justPressed || ((previous == null || previous.lane != lane) && !lastPressedLanes[lane]))
 			justPressedLanes[lane] = true;
 		currentZones.set(id, zone);
+	}
+
+	function stillInside(zone:HitboxZone, x:Float, y:Float, worldX:Float, worldY:Float):Bool
+	{
+		if (zone == null || !zone.exists)
+			return false;
+		if (mode == MODE_ARROWS)
+		{
+			var current = getArrowZone(worldX, worldY, STICKY_SLACK);
+			return current == zone;
+		}
+		if (zone.contains(x, y))
+			return true;
+		for (offset in [[STICKY_SLACK, 0], [-STICKY_SLACK, 0], [0, STICKY_SLACK], [0, -STICKY_SLACK]])
+			if (zone.contains(x + offset[0], y + offset[1]))
+				return true;
+		return false;
 	}
 
 	function getArrowCamera():FlxCamera
@@ -362,7 +403,7 @@ class Hitbox extends FlxTypedGroup<FlxSprite>
 		return null;
 	}
 
-	function getArrowZone(worldX:Float, worldY:Float):HitboxZone
+	function getArrowZone(worldX:Float, worldY:Float, slack:Float = 0):HitboxZone
 	{
 		if (arrowTargets == null)
 			return null;
@@ -372,26 +413,55 @@ class Hitbox extends FlxTypedGroup<FlxSprite>
 
 		var camera = getArrowCamera();
 		var point = FlxPoint.get();
-		var best = -1;
-		var bestDistance = Math.POSITIVE_INFINITY;
+		var top = Math.POSITIVE_INFINITY;
+		var bottom = Math.NEGATIVE_INFINITY;
+		var left = Math.POSITIVE_INFINITY;
+		var right = Math.NEGATIVE_INFINITY;
+		var centers:Array<Float> = [];
+		var count = 0;
+		var averageWidth:Float = 0;
+		var averageHeight:Float = 0;
 		for (i => target in targets)
 		{
 			if (target == null || !target.exists || i >= keyCount)
-				continue;
-			target.getScreenPosition(point, camera);
-			var padX = target.width * 0.35;
-			var padY = target.height * 0.6;
-			if (worldX >= point.x - padX && worldX <= point.x + target.width + padX && worldY >= point.y - padY && worldY <= point.y + target.height + padY)
 			{
-				var distance = Math.abs(worldX - (point.x + target.width / 2)) + Math.abs(worldY - (point.y + target.height / 2));
-				if (distance < bestDistance)
-				{
-					bestDistance = distance;
-					best = i;
-				}
+				centers.push(Math.NaN);
+				continue;
 			}
+			target.getScreenPosition(point, camera);
+			centers.push(point.x + target.width / 2);
+			top = Math.min(top, point.y);
+			bottom = Math.max(bottom, point.y + target.height);
+			left = Math.min(left, point.x);
+			right = Math.max(right, point.x + target.width);
+			averageWidth += target.width;
+			averageHeight += target.height;
+			count++;
 		}
 		point.put();
+		if (count == 0)
+			return null;
+		averageWidth /= count;
+		averageHeight /= count;
+
+		var padY = averageHeight * ARROWS_BAND + slack;
+		var padX = averageWidth * 0.6 + slack;
+		if (worldY < top - padY || worldY > bottom + padY || worldX < left - padX || worldX > right + padX)
+			return null;
+
+		var best = -1;
+		var bestDistance = Math.POSITIVE_INFINITY;
+		for (i => center in centers)
+		{
+			if (Math.isNaN(center))
+				continue;
+			var distance = Math.abs(worldX - center);
+			if (distance < bestDistance)
+			{
+				bestDistance = distance;
+				best = i;
+			}
+		}
 		return best >= 0 && best < zones.length ? zones[best] : null;
 	}
 

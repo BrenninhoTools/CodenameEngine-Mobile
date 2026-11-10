@@ -210,7 +210,7 @@ class StrumLine extends FlxTypedGroup<Strum> {
 	public override function draw() {
 		super.draw();
 		notes.cameras = cameras;
-		notes.draw();
+		if (notes.visible) notes.draw();
 	}
 
 	/**

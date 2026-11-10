@@ -1045,7 +1045,6 @@ class PlayState extends MusicBeatState
 		var scale = Flags.DEFAULT_NOTE_SCALE * strLine.strumScale * funkin.mobile.Hitbox.OPPONENT_SCALE;
 		var margin:Float = 16;
 		var left = funkin.backend.utils.ScreenUtil.safeLeft + margin;
-		var top = funkin.backend.utils.ScreenUtil.safeTop + margin + getMobileFramerateHeight();
 		var x = left;
 		for (i => strum in strLine.members) {
 			if (strum == null) continue;
@@ -1053,7 +1052,7 @@ class PlayState extends MusicBeatState
 			strum.scale.set(scale, scale);
 			strum.updateHitbox();
 			strum.x = x;
-			strum.y = downscroll ? camHUD.height - top - strum.height : top;
+			strum.y = healthBarBG != null ? healthBarBG.y + healthBarBG.height / 2 - strum.height / 2 : this.strumLine.y;
 			x += strum.width + 2;
 		}
 	}
@@ -1063,12 +1062,6 @@ class PlayState extends MusicBeatState
 		FlxTween.cancelTweensOf(strum, ["y"]);
 		if (strum.alpha < 1)
 			FlxTween.tween(strum, {alpha: 1}, 1, {ease: FlxEase.circOut, startDelay: 0.5 + 0.2 * index});
-	}
-
-	function getMobileFramerateHeight():Float {
-		var counter = funkin.backend.system.Main.framerateSprite;
-		if (counter == null || !counter.visible || !Options.fpsCounter || FlxG.scaleMode == null || FlxG.scaleMode.scale.y <= 0) return 0;
-		return counter.height / FlxG.scaleMode.scale.y;
 	}
 
 	function getMobileKeyCount():Int {

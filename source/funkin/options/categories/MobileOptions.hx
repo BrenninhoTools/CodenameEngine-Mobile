@@ -22,10 +22,7 @@ class MobileOptions extends TreeMenuScreen {
 		}));
 		#end
 
-		add(new NumOption(getNameID('hitboxOpacity'), getDescID('hitboxOpacity'), 0, 100, 5, 'hitboxOpacity'));
-		add(new ArrayOption(getNameID('hitboxStyle'), getDescID('hitboxStyle'), funkin.mobile.Hitbox.STYLES, funkin.mobile.Hitbox.STYLES, 'hitboxStyle'));
 		add(new ArrayOption(getNameID('hitboxColors'), getDescID('hitboxColors'), funkin.mobile.Hitbox.COLOR_MODES, funkin.mobile.Hitbox.COLOR_MODES, 'hitboxColors'));
-		add(new Checkbox(getNameID('hitboxHint'), getDescID('hitboxHint'), 'hitboxHint'));
 		add(new Checkbox(getNameID('antiCrash'), getDescID('antiCrash'), 'antiCrash'));
 		add(new TextOption(getNameID('storageInfo'), getDescID('storageInfo'), () -> {
 			funkin.backend.system.modules.AntiCrash.showNotice('Storage', StorageUtil.getStorageInfo());
