@@ -133,7 +133,6 @@
 
 	<section if="android">
 		<architecture exclude="armv7"/>
-		<java path="android/java"/>
 		<config:android permission="android.permission.READ_EXTERNAL_STORAGE"/>
 		<config:android permission="android.permission.WRITE_EXTERNAL_STORAGE"/>
 		<config:android permission="android.permission.MANAGE_EXTERNAL_STORAGE"/>
@@ -166,7 +165,7 @@
 	<haxelib name="nape-haxe4" if="NAPE_ENABLED"/>
 
 	<haxelib name="hxcpp-debug-server" if="debug"/>
-	<haxelib name="extension-androidtools" if="android"/>
+	<haxelib name="android-manager" if="android"/>
 
 	<!-- ____________________________ Source Settings ___________________________ -->
 

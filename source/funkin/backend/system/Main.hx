@@ -208,15 +208,13 @@ class Main extends Sprite
 	static function updateSafeInsets() {
 		#if android
 		try {
-			var method:Dynamic = lime.system.JNI.createStaticMethod("org/codename/mobile/ScreenHelper", "getSafeInsets", "()Ljava/lang/String;");
-			if (method == null) return;
-			var parts = Std.string(method()).split(",");
-			if (parts.length == 4) {
-				safeInsetLeft = Math.max(0, Std.parseFloat(parts[0]));
-				safeInsetTop = Math.max(0, Std.parseFloat(parts[1]));
-				safeInsetRight = Math.max(0, Std.parseFloat(parts[2]));
-				safeInsetBottom = Math.max(0, Std.parseFloat(parts[3]));
-			}
+			var info = androidmanager.view.Window.info;
+			var cutout = info != null ? info.displayCutout : null;
+			if (cutout == null) return;
+			safeInsetLeft = Math.max(0, cutout.left);
+			safeInsetTop = Math.max(0, cutout.top);
+			safeInsetRight = Math.max(0, cutout.right);
+			safeInsetBottom = Math.max(0, cutout.bottom);
 		} catch (_:Dynamic) {}
 		#end
 	}
@@ -234,8 +232,8 @@ class Main extends Sprite
 	static function applyImmersive() {
 		#if android
 		try {
-			var method:Dynamic = lime.system.JNI.createStaticMethod("org/codename/mobile/ScreenHelper", "applyImmersive", "()V");
-			if (method != null) method();
+			androidmanager.view.Window.setLayoutInCutout(true);
+			androidmanager.view.Window.immersive = true;
 		} catch (_:Dynamic) {}
 		#end
 	}

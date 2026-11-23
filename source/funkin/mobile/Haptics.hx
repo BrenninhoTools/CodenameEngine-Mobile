@@ -12,12 +12,6 @@ class Haptics
 
 	static var lastTime:Float = -1;
 
-	#if android
-	static var vibrateMethod:Dynamic = null;
-	static var cancelMethod:Dynamic = null;
-	static var methodsFailed:Bool = false;
-	#end
-
 	static function get_enabled():Bool
 		return #if mobile Options.haptics && Options.hapticsIntensity > 0 #else false #end;
 
@@ -65,11 +59,9 @@ class Haptics
 	public static function cancel()
 	{
 		#if android
-		if (!loadMethods() || cancelMethod == null)
-			return;
 		try
 		{
-			cancelMethod();
+			androidmanager.os.Vibrator.cancel();
 		}
 		catch (_:Dynamic) {}
 		#end
@@ -78,38 +70,21 @@ class Haptics
 	static function play(duration:Int, amount:Float)
 	{
 		#if android
-		if (!loadMethods())
-			return;
 		try
 		{
-			vibrateMethod(duration, Std.int(Math.max(1, Math.round(amount * 255))));
+			if (!androidmanager.os.Vibrator.hasVibrator)
+				return;
+			var strength = Std.int(Math.max(1, Math.min(255, Math.round(amount * 255))));
+			if (androidmanager.os.Vibrator.hasAmplitudeControl)
+				androidmanager.os.Vibrator.vibrate(duration, strength);
+			else
+				androidmanager.os.Vibrator.vibrate(Std.int(Math.max(1, duration * amount)), -1);
 		}
 		catch (_:Dynamic) {}
 		#elseif ios
 		playIOS(amount >= 0.75 || duration >= 120 ? (duration >= 120 ? 4095 : 1520) : 1519);
 		#end
 	}
-
-	#if android
-	static function loadMethods():Bool
-	{
-		if (vibrateMethod != null)
-			return true;
-		if (methodsFailed)
-			return false;
-		try
-		{
-			vibrateMethod = lime.system.JNI.createStaticMethod("org/codename/mobile/HapticHelper", "vibrate", "(II)V");
-			cancelMethod = lime.system.JNI.createStaticMethod("org/codename/mobile/HapticHelper", "cancel", "()V");
-		}
-		catch (_:Dynamic)
-		{
-			vibrateMethod = null;
-		}
-		methodsFailed = vibrateMethod == null;
-		return !methodsFailed;
-	}
-	#end
 
 	#if ios
 	static function playIOS(soundID:Int)

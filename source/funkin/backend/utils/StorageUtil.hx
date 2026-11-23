@@ -3,7 +3,7 @@ package funkin.backend.utils;
 import haxe.io.Bytes;
 import haxe.io.Path;
 #if android
-import extension.androidtools.content.Context;
+import androidmanager.content.Context;
 #end
 #if sys
 import sys.FileSystem;
@@ -764,35 +764,11 @@ class StorageUtil
 #if android
 class AndroidStorage
 {
-	static final HELPER_CLASS:String = "org/codename/mobile/StorageHelper";
-
-	static var methods:Map<String, Dynamic> = new Map();
-
-	static function getMethod(name:String, signature:String):Dynamic
-	{
-		var key = name + signature;
-		if (!methods.exists(key))
-		{
-			var method:Dynamic = null;
-			try
-			{
-				method = lime.system.JNI.createStaticMethod(HELPER_CLASS, name, signature);
-			}
-			catch (e:Dynamic)
-			{
-				method = null;
-			}
-			methods.set(key, method);
-		}
-		return methods.get(key);
-	}
-
 	public static function getExternalStorageDirectory():String
 	{
 		try
 		{
-			var method = getMethod("getExternalStorageDirectory", "()Ljava/lang/String;");
-			return method == null ? null : method();
+			return androidmanager.content.Storage.getPath(androidmanager.content.Storage.StorageLocation.ROOT);
 		}
 		catch (e:Dynamic)
 		{
@@ -804,8 +780,7 @@ class AndroidStorage
 	{
 		try
 		{
-			var method = getMethod("getExternalMediaDirectory", "()Ljava/lang/String;");
-			return method == null ? null : method();
+			return Context.getExternalMediaDir();
 		}
 		catch (e:Dynamic)
 		{
@@ -817,8 +792,7 @@ class AndroidStorage
 	{
 		try
 		{
-			var method = getMethod("hasStoragePermission", "()Z");
-			return method != null && method() == true;
+			return androidmanager.tools.PermissionUtils.isExternalStorageManager();
 		}
 		catch (e:Dynamic)
 		{
@@ -830,9 +804,8 @@ class AndroidStorage
 	{
 		try
 		{
-			var method = getMethod("requestStoragePermission", "()V");
-			if (method != null)
-				method();
+			if (!hasStoragePermission())
+				androidmanager.tools.PermissionUtils.requestManageExternalStorage();
 		}
 		catch (e:Dynamic) {}
 	}
@@ -841,8 +814,7 @@ class AndroidStorage
 	{
 		try
 		{
-			var method = getMethod("copyAsset", "(Ljava/lang/String;Ljava/lang/String;)Z");
-			return method != null && method(assetPath, targetPath) == true;
+			return androidmanager.content.Assets.copy(assetPath, targetPath);
 		}
 		catch (e:Dynamic)
 		{
@@ -854,8 +826,15 @@ class AndroidStorage
 	{
 		try
 		{
-			var method = getMethod("startBatchCopy", "(Ljava/lang/String;I)Z");
-			return method != null && method(jobs, threads) == true;
+			var list:Array<androidmanager.content.Assets.AssetCopyJob> = [];
+			if (jobs != null && jobs.length > 0)
+				for (line in jobs.split("\n"))
+				{
+					var parts = line.split("\t");
+					if (parts.length == 3)
+						list.push({source: parts[1], target: parts[2], fromFile: parts[0] == "F", id: line});
+				}
+			return androidmanager.content.Assets.batch(list, threads);
 		}
 		catch (e:Dynamic)
 		{
@@ -867,11 +846,7 @@ class AndroidStorage
 	{
 		try
 		{
-			var method = getMethod("getBatchCompleted", "()I");
-			if (method == null)
-				return 0;
-			var value:Dynamic = method();
-			return value == null ? 0 : Std.int(value);
+			return androidmanager.content.Assets.batchCompleted;
 		}
 		catch (e:Dynamic)
 		{
@@ -883,8 +858,7 @@ class AndroidStorage
 	{
 		try
 		{
-			var method = getMethod("isBatchRunning", "()Z");
-			return method != null && method() == true;
+			return androidmanager.content.Assets.batchRunning;
 		}
 		catch (e:Dynamic)
 		{
@@ -896,11 +870,7 @@ class AndroidStorage
 	{
 		try
 		{
-			var method = getMethod("getBatchFailed", "()Ljava/lang/String;");
-			if (method == null)
-				return "";
-			var value:Dynamic = method();
-			return value == null ? "" : Std.string(value);
+			return [for (job in androidmanager.content.Assets.getFailed()) Std.string(job.id)].join("\n");
 		}
 		catch (e:Dynamic)
 		{
@@ -912,11 +882,8 @@ class AndroidStorage
 	{
 		try
 		{
-			var method = getMethod("getFreeSpace", "(Ljava/lang/String;)D");
-			if (method == null)
-				return -1;
-			var value:Dynamic = method(path);
-			return value == null ? -1 : value;
+			var space = androidmanager.content.Storage.getSpace(path);
+			return space == null ? -1 : space.available;
 		}
 		catch (e:Dynamic)
 		{
