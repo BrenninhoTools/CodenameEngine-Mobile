@@ -57,7 +57,7 @@ permissions:
 env:
   HAXE_VERSION: 4.3.7
   NDK_VERSION: r27c
-  LIBS_CACHE_VERSION: v7
+  LIBS_CACHE_VERSION: v8
   HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
   GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false
   BUILD_TYPE: ${{ inputs.build_type || 'release' }}
@@ -72,14 +72,23 @@ jobs:
       ios: ${{ steps.plan.outputs.ios }}
       version: ${{ steps.plan.outputs.version }}
       suffix: ${{ steps.plan.outputs.suffix }}
+      libs: ${{ steps.libs.outputs.key }}
       tag: ${{ steps.plan.outputs.tag }}
       title: ${{ steps.plan.outputs.title }}
     steps:
       - name: Pulling the project file
         uses: actions/checkout@v7
         with:
-          sparse-checkout: project.xml
+          sparse-checkout: |
+            project.xml
+            building/libs.xml
+            building/patch-lime-mobile.sh
+            building/resolve-libs.py
           sparse-checkout-cone-mode: false
+
+      - name: Resolving library versions
+        id: libs
+        run: python3 building/resolve-libs.py building/libs.xml building/patch-lime-mobile.sh
 
       - name: Planning the build
         id: plan
@@ -129,6 +138,11 @@ jobs:
           fetch-depth: 0
           filter: blob:none
 
+      - name: Freeing disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/emulator /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift &
+          df -h / | tail -n 1
+
       - name: Setting up Java
         uses: actions/setup-java@v5
         with:
@@ -170,7 +184,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .haxelib
-          key: libs-android-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
+          key: libs-android-${{ env.LIBS_CACHE_VERSION }}-${{ needs.prepare.outputs.libs }}
 
       - name: Restoring compile cache
         if: ${{ !inputs.clear_compile_cache }}
@@ -244,7 +258,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: .haxelib
-          key: libs-${{ github.job }}-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
+          key: libs-${{ github.job }}-${{ env.LIBS_CACHE_VERSION }}-${{ needs.prepare.outputs.libs }}
 
       - name: Removing stale precompiled headers
         run: |
@@ -272,10 +286,28 @@ jobs:
           EOF
 
       - name: Building the game
-        run: haxelib run lime build android -${{ env.BUILD_TYPE }} -arm64 -DCOMPILE_EXPERIMENTAL
+        run: |
+          START=$(date +%s)
+          haxelib run lime build android -${{ env.BUILD_TYPE }} -arm64 -DCOMPILE_EXPERIMENTAL
+          END=$(date +%s)
+          echo "Build took $(( (END - START) / 60 ))m $(( (END - START) % 60 ))s" >> $GITHUB_STEP_SUMMARY
+
+      - name: Trimming compile cache
+        id: trim-cache
+        if: always() && !cancelled()
+        run: |
+          if [ -d .hxcpp_cache ]; then
+            SIZE=$(du -sk .hxcpp_cache | cut -f1)
+            echo "Compile cache: $(( SIZE / 1024 )) MB"
+            if [ "$SIZE" -gt 3145728 ]; then
+              echo "Compile cache is over 3 GB, clearing it"
+              rm -rf .hxcpp_cache
+            fi
+          fi
+          [ -d .hxcpp_cache ] && echo "exists=true" >> $GITHUB_OUTPUT || true
 
       - name: Saving compile cache
-        if: always() && github.event_name != 'pull_request' && !cancelled()
+        if: always() && github.event_name != 'pull_request' && !cancelled() && steps.trim-cache.outputs.exists == 'true'
         uses: actions/cache/save@v6
         with:
           path: .hxcpp_cache
@@ -367,7 +399,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .haxelib
-          key: libs-ios-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
+          key: libs-ios-${{ env.LIBS_CACHE_VERSION }}-${{ needs.prepare.outputs.libs }}
 
       - name: Restoring compile cache
         if: ${{ !inputs.clear_compile_cache }}
@@ -399,7 +431,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: .haxelib
-          key: libs-${{ github.job }}-${{ env.LIBS_CACHE_VERSION }}-${{ hashFiles('building/libs.xml', 'building/patch-lime-mobile.sh') }}
+          key: libs-${{ github.job }}-${{ env.LIBS_CACHE_VERSION }}-${{ needs.prepare.outputs.libs }}
 
       - name: Removing stale precompiled headers
         run: |
@@ -408,10 +440,28 @@ jobs:
           fi
 
       - name: Building the game
-        run: haxelib run lime build ios -${{ env.BUILD_TYPE }} -nosign -DCOMPILE_EXPERIMENTAL
+        run: |
+          START=$(date +%s)
+          haxelib run lime build ios -${{ env.BUILD_TYPE }} -nosign -DCOMPILE_EXPERIMENTAL
+          END=$(date +%s)
+          echo "Build took $(( (END - START) / 60 ))m $(( (END - START) % 60 ))s" >> $GITHUB_STEP_SUMMARY
+
+      - name: Trimming compile cache
+        id: trim-cache
+        if: always() && !cancelled()
+        run: |
+          if [ -d .hxcpp_cache ]; then
+            SIZE=$(du -sk .hxcpp_cache | cut -f1)
+            echo "Compile cache: $(( SIZE / 1024 )) MB"
+            if [ "$SIZE" -gt 3145728 ]; then
+              echo "Compile cache is over 3 GB, clearing it"
+              rm -rf .hxcpp_cache
+            fi
+          fi
+          [ -d .hxcpp_cache ] && echo "exists=true" >> $GITHUB_OUTPUT || true
 
       - name: Saving compile cache
-        if: always() && github.event_name != 'pull_request' && !cancelled()
+        if: always() && github.event_name != 'pull_request' && !cancelled() && steps.trim-cache.outputs.exists == 'true'
         uses: actions/cache/save@v6
         with:
           path: .hxcpp_cache
@@ -445,6 +495,18 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
+
+      - name: Uploading logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-logs-${{ github.run_id }}
+          path: |
+            export/*/ios/build/**/*.log
+            export/*/ios/haxe/*.log
+            ~/Library/Logs/DiagnosticReports/**
+          if-no-files-found: ignore
+          retention-days: 7
 
   release:
     name: Publishing Release
