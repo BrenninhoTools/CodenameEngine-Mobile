@@ -191,10 +191,10 @@
 		<str id="hitboxColors-desc">The colors of the hitbox lanes and buttons. Classic uses the default note colors.</str>
 		<str id="invisiblePauseButton-name">Invisible Pause Button</str>
 		<str id="invisiblePauseButton-desc">If checked, the pause button will be invisible during songs, but you can still tap it to pause.</str>
-		<str id="haptics-name">Haptics</str>
-		<str id="haptics-desc">If checked, the device vibrates when you navigate menus, confirm, miss a note or die.</str>
+		<str id="hapticsMode-name">Haptics</str>
+		<str id="hapticsMode-desc">When the device vibrates. None turns it off, Only Notes vibrates when you hit or miss a note and when you die, All also vibrates in menus.</str>
 		<str id="hapticsIntensity-name">Haptics Intensity</str>
-		<str id="hapticsIntensity-desc">How strong the vibration is, from 0 to 100. Some devices only support one strength.</str>
+		<str id="hapticsIntensity-desc">How strong the vibration is, from 0.1 to 5.0. Above 1.0 the vibration also lasts longer. Some devices only support one strength.</str>
 		<str id="antiCrash-name">AntiCrash</str>
 		<str id="antiCrash-desc">If checked, errors are caught and the game recovers by disabling broken scripts, closing menus, leaving songs or switching back to the base game instead of crashing.</str>
 		<str id="storageInfo-name">Storage Info</str>

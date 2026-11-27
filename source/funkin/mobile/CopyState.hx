@@ -337,18 +337,15 @@ class CopyState extends FlxState
 	static inline var BATCH_THREADS:Int = 4;
 
 	var batchActive:Bool = false;
-	var batchLines:Map<String, CopyJob> = [];
 	var batchTotal:Int = 0;
-	var batchStart:Float = 0;
 	var batchHasMigration:Bool = false;
 
 	function startBatch()
 	{
-		var lines:Array<String> = [];
+		var batchJobs:Array<androidmanager.content.Assets.AssetCopyJob> = [];
 		var sequential:Array<CopyJob> = [];
 		for (job in jobs)
 		{
-			var line:String = null;
 			switch (job.kind)
 			{
 				case BUNDLED:
@@ -359,58 +356,40 @@ class CopyState extends FlxState
 					}
 					catch (e:Dynamic) {}
 					if (path != null && path.length > 0)
-						line = 'A\t$path\t${job.target}';
+						batchJobs.push({source: path, target: job.target, id: job});
+					else
+						sequential.push(job);
 				case MIGRATE:
-					line = 'F\t${job.source}\t${job.target}';
+					batchJobs.push({source: job.source, target: job.target, fromFile: true, id: job});
 					batchHasMigration = true;
 			}
-			if (line != null && line.indexOf("\n") < 0)
-			{
-				lines.push(line);
-				batchLines.set(line, job);
-			}
-			else
-				sequential.push(job);
 		}
 
-		if (lines.length == 0 || !StorageUtil.startBatchCopy(lines.join("\n"), BATCH_THREADS))
-		{
-			batchLines.clear();
+		if (batchJobs.length == 0 || !androidmanager.content.Assets.batch(batchJobs, BATCH_THREADS))
 			return;
-		}
 
 		jobs = sequential;
-		batchTotal = lines.length;
+		batchTotal = batchJobs.length;
 		batchActive = true;
-		batchStart = haxe.Timer.stamp();
 	}
 
 	function updateBatch()
 	{
-		var completed = StorageUtil.getBatchCompleted();
+		var progress = androidmanager.content.Assets.progress();
 		var total = batchTotal + jobs.length;
-		progressBar.scale.x = total == 0 ? 1 : completed / total;
+		progressBar.scale.x = total == 0 ? 1 : progress.completed / total;
 		statusText.text = batchHasMigration ? "Moving mods to the new storage..." : "Extracting mods...";
-		progressText.text = '$completed / $total';
+		progressText.text = '${progress.completed} / $total';
 
-		if (StorageUtil.isBatchRunning())
+		if (progress.running)
 			return;
 
 		batchActive = false;
-		var failed = StorageUtil.getBatchFailed();
-		var failedCount = 0;
-		if (failed != null && failed.length > 0)
-			for (line in failed.split("\n"))
-			{
-				var job = batchLines.get(line);
-				if (job != null)
-				{
-					jobs.push(job);
-					failedCount++;
-				}
-			}
-		Logs.trace('[CopyState] Copied ${batchTotal - failedCount}/$batchTotal files in ${Math.round((haxe.Timer.stamp() - batchStart) * 1000)}ms, ${jobs.length} left for the fallback copier', INFO);
-		batchLines.clear();
+		var failed = androidmanager.content.Assets.getFailed();
+		for (job in failed)
+			if (job.id != null)
+				jobs.push(cast job.id);
+		Logs.trace('[CopyState] Copied ${batchTotal - failed.length}/$batchTotal mod files in ${Math.round(progress.elapsed * 1000)}ms, ${jobs.length} left for the fallback copier', INFO);
 		index = 0;
 	}
 	#end

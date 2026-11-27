@@ -47,8 +47,8 @@ class Options
 	public static var hitboxColors:String = "Classic";
 	@:doNotSave public static var hitboxHint:Bool = false;
 	public static var invisiblePauseButton:Bool = false;
-	public static var haptics:Bool = true;
-	public static var hapticsIntensity:Float = 60;
+	public static var hapticsMode:String = "All";
+	public static var hapticsIntensity:Float = 1;
 	@:doNotSave public static var storageType:String = "Data";
 	public static var antialiasing:Bool = true;
 	public static var volume:Float = 1;

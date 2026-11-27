@@ -18,7 +18,7 @@ class NumOption extends TextOption {
 	var __number:Alphabet;
 
 	function set_currentValue(v:Float):Float {
-		if (__number != null && v != currentValue) __number.text = TextOption.OPTION_VALUE_PREFIX + Std.string(v);
+		if (__number != null && v != currentValue) __number.text = TextOption.OPTION_VALUE_PREFIX + formatValue(v);
 		return currentValue = v;
 	}
 
@@ -37,14 +37,14 @@ class NumOption extends TextOption {
 		this.parent = parent = parent != null ? parent : Options;
 
 		if (Reflect.field(parent, optionName) != null) currentValue = Reflect.field(parent, optionName);
-		__number = new Alphabet(0, 20, TextOption.OPTION_VALUE_PREFIX + Std.string(currentValue), 'bold');
+		__number = new Alphabet(0, 20, TextOption.OPTION_VALUE_PREFIX + formatValue(currentValue), 'bold');
 		super(text, desc);
 		add(__number);
 	}
 
 	override function changeSelection(change:Int):Void {
 		if (locked) return;
-		if (currentValue == (currentValue = FlxMath.bound(currentValue + change * step, min, max))) return;
+		if (currentValue == (currentValue = roundToStep(FlxMath.bound(currentValue + change * step, min, max)))) return;
 
 		Reflect.setField(parent, optionName, currentValue);
 		if (changedCallback != null) changedCallback(currentValue);
@@ -53,4 +53,29 @@ class NumOption extends TextOption {
 	}
 
 	override function select() {}
+
+	function stepDecimals():Int {
+		var decimals = 0;
+		var value = Math.abs(step);
+		while (decimals < 6 && Math.abs(value - Math.round(value)) > 0.0000001) {
+			value *= 10;
+			decimals++;
+		}
+		return decimals;
+	}
+
+	function roundToStep(v:Float):Float {
+		var factor = Math.pow(10, stepDecimals());
+		return Math.round(v * factor) / factor;
+	}
+
+	function formatValue(v:Float):String {
+		var decimals = stepDecimals();
+		if (decimals == 0) return Std.string(v);
+		var text = Std.string(roundToStep(v));
+		var dot = text.indexOf(".");
+		if (dot < 0) text += "." + StringTools.lpad("", "0", decimals);
+		else if (text.length - dot - 1 < decimals) text += StringTools.lpad("", "0", decimals - (text.length - dot - 1));
+		return text;
+	}
 }

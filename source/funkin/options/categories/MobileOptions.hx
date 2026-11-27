@@ -9,8 +9,8 @@ class MobileOptions extends TreeMenuScreen {
 		add(new ArrayOption(getNameID('hitboxMode'), getDescID('hitboxMode'), funkin.mobile.Hitbox.MODES, funkin.mobile.Hitbox.MODES, 'hitboxMode'));
 		add(new Checkbox(getNameID('invisibleHitbox'), getDescID('invisibleHitbox'), 'invisibleHitbox'));
 		add(new Checkbox(getNameID('invisiblePauseButton'), getDescID('invisiblePauseButton'), 'invisiblePauseButton'));
-		add(new Checkbox(getNameID('haptics'), getDescID('haptics'), 'haptics', () -> funkin.mobile.Haptics.preview()));
-		add(new NumOption(getNameID('hapticsIntensity'), getDescID('hapticsIntensity'), 0, 100, 10, 'hapticsIntensity', (_) -> funkin.mobile.Haptics.preview()));
+		add(new ArrayOption(getNameID('hapticsMode'), getDescID('hapticsMode'), funkin.mobile.Haptics.MODES, funkin.mobile.Haptics.MODES, 'hapticsMode', (_) -> funkin.mobile.Haptics.preview()));
+		add(new NumOption(getNameID('hapticsIntensity'), getDescID('hapticsIntensity'), funkin.mobile.Haptics.MIN_INTENSITY, funkin.mobile.Haptics.MAX_INTENSITY, 0.1, 'hapticsIntensity', (_) -> funkin.mobile.Haptics.preview()));
 		add(new ArrayOption(getNameID('screenStyle'), getDescID('screenStyle'), ["Original", "Full"], ["Original", "Full"], 'screenStyle', (_) -> funkin.backend.system.FunkinRatioScaleMode.refresh()));
 
 		#if android
@@ -21,20 +21,5 @@ class MobileOptions extends TreeMenuScreen {
 				updateMenuDesc(TU.translate(getID('storageType-restart')));
 		}));
 		#end
-
-		add(new ArrayOption(getNameID('hitboxColors'), getDescID('hitboxColors'), funkin.mobile.Hitbox.COLOR_MODES, funkin.mobile.Hitbox.COLOR_MODES, 'hitboxColors'));
-		add(new Checkbox(getNameID('antiCrash'), getDescID('antiCrash'), 'antiCrash'));
-		add(new TextOption(getNameID('storageInfo'), getDescID('storageInfo'), () -> {
-			funkin.backend.system.modules.AntiCrash.showNotice('Storage', StorageUtil.getStorageInfo());
-		}));
-		add(new TextOption(getNameID('reextractAssets'), getDescID('reextractAssets'), () -> {
-			StorageUtil.requestReextract();
-			funkin.backend.system.modules.AntiCrash.showNotice('Mods will be extracted again', 'Restart the game to apply.');
-		}));
-		add(new TextOption(getNameID('resetModFiles'), getDescID('resetModFiles'), () -> {
-			var count = funkin.backend.assets.ModGuard.getBlocked().length;
-			funkin.backend.assets.ModGuard.clearBlocked();
-			funkin.backend.system.modules.AntiCrash.showNotice('Re-enabled $count mod files', null);
-		}));
 	}
 }
