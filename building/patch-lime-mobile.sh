@@ -6,6 +6,7 @@ BINDINGS="$LIME_PATH/project/src/graphics/opengl/OpenGLBindings.cpp"
 BUILD_XML="$LIME_PATH/project/Build.xml"
 SDL_SYSTEM="$LIME_PATH/project/src/backend/sdl/SDLSystem.cpp"
 JNI_SOURCE="$LIME_PATH/project/src/system/JNI.cpp"
+APPLE_SYSTEM="$LIME_PATH/project/src/system/System.mm"
 
 for file in "$BINDINGS" "$BUILD_XML"; do
 	if [ ! -f "$file" ]; then
@@ -46,3 +47,21 @@ if [ -f "$SDL_SYSTEM" ] && [ -f "$JNI_SOURCE" ] && grep -q "JNI::GetEnv ()" "$JN
 		echo "Removed the duplicated JNI::GetEnv from SDLSystem.cpp on Android."
 	fi
 fi
+
+if [ -f "$APPLE_SYSTEM" ]; then
+	if grep -q "LIME_MOBILE_APPLE_STRINGS_PATCH" "$APPLE_SYSTEM"; then
+		echo "System.mm is already patched."
+	else
+		perl -pi -e 's/return systemInfo\.machine;/return strdup (systemInfo.machine);/; s/return \[\[\[UIDevice currentDevice\] systemVersion\] UTF8String\];/return strdup ([[[UIDevice currentDevice] systemVersion] UTF8String]);/' "$APPLE_SYSTEM"
+		if ! grep -q "#include <string.h>" "$APPLE_SYSTEM"; then
+			perl -0pi -e 's/(#include <system\/System.h>)/#include <string.h>\n$1/' "$APPLE_SYSTEM"
+		fi
+		if grep -q "return systemInfo.machine;" "$APPLE_SYSTEM" || grep -q "return \[\[\[UIDevice currentDevice\] systemVersion\] UTF8String\];" "$APPLE_SYSTEM"; then
+			echo "Could not patch the returned strings in System.mm."
+			exit 1
+		fi
+		printf '\n// LIME_MOBILE_APPLE_STRINGS_PATCH\n' >> "$APPLE_SYSTEM"
+		echo "Patched System.mm to return heap copies of the device strings."
+	fi
+fi
+

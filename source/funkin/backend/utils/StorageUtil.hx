@@ -72,31 +72,22 @@ class StorageUtil
 	{
 		#if android
 		var path:String = null;
-		try
+		switch (type)
 		{
-			switch (type)
-			{
-				case STORAGE_MEDIA:
-					path = AndroidStorage.getExternalMediaDirectory();
-				case STORAGE_OBB:
-					path = Context.getObbDir();
-				case STORAGE_EXTERNAL:
-					if (AndroidStorage.hasStoragePermission())
-					{
-						var external = AndroidStorage.getExternalStorageDirectory();
-						if (external != null && external.length > 0)
-							path = Path.addTrailingSlash(external) + EXTERNAL_FOLDER;
-					}
-					else
-						AndroidStorage.requestStoragePermission();
-				default:
-					path = getDataDirectory();
-			}
+			case STORAGE_MEDIA:
+				path = AndroidStorage.getPath(MEDIA);
+			case STORAGE_OBB:
+				path = AndroidStorage.getPath(OBB);
+			case STORAGE_EXTERNAL:
+				if (AndroidStorage.hasStoragePermission())
+					path = AndroidStorage.getPath(ROOT, EXTERNAL_FOLDER);
+				else
+					AndroidStorage.requestStoragePermission();
+			default:
+				path = getDataDirectory();
 		}
-		catch (e:Dynamic)
-		{
+		if (type != STORAGE_DATA && !AndroidStorage.isMounted())
 			path = null;
-		}
 		return (path == null || path.length == 0) ? null : Path.addTrailingSlash(path);
 		#else
 		return storageDirectory;
@@ -106,17 +97,11 @@ class StorageUtil
 	#if android
 	public static function getDataDirectory():String
 	{
-		var path:String = null;
-		try
-		{
-			path = Context.getExternalFilesDir();
-		}
-		catch (e:Dynamic)
-		{
-			path = null;
-		}
+		var path = AndroidStorage.isMounted() ? AndroidStorage.getPath(EXTERNAL) : null;
 		if (path == null || path.length == 0 || !isWritable(Path.addTrailingSlash(path)))
-			path = Context.getFilesDir();
+			path = AndroidStorage.getPath(INTERNAL);
+		if (path == null || path.length == 0)
+			path = lime.system.System.applicationStorageDirectory;
 		return Path.addTrailingSlash(path);
 	}
 	#end
@@ -174,9 +159,9 @@ class StorageUtil
 	public static function getExternalFolder():String
 	{
 		#if android
-		var external = AndroidStorage.getExternalStorageDirectory();
+		var external = AndroidStorage.getPath(ROOT, EXTERNAL_FOLDER);
 		if (external != null && external.length > 0)
-			return Path.addTrailingSlash(Path.addTrailingSlash(external) + EXTERNAL_FOLDER);
+			return Path.addTrailingSlash(external);
 		#end
 		return null;
 	}
@@ -261,10 +246,13 @@ class StorageUtil
 		#end
 	}
 
-	public static function requestStoragePermission()
+	public static function requestStoragePermission(?callback:Bool->Void)
 	{
 		#if android
-		AndroidStorage.requestStoragePermission();
+		AndroidStorage.requestStoragePermission(callback);
+		#else
+		if (callback != null)
+			callback(true);
 		#end
 	}
 
@@ -294,6 +282,10 @@ class StorageUtil
 
 	static function ensureNoMedia(path:String)
 	{
+		#if android
+		if (AndroidStorage.createNoMedia(path))
+			return;
+		#end
 		#if sys
 		try
 		{
@@ -326,6 +318,11 @@ class StorageUtil
 
 	public static function getDirectorySize(path:String):Float
 	{
+		#if android
+		var size = AndroidStorage.getSize(path);
+		if (size >= 0)
+			return size;
+		#end
 		var total:Float = 0;
 		#if sys
 		try
@@ -502,6 +499,10 @@ class StorageUtil
 
 	public static function isWritable(path:String):Bool
 	{
+		#if android
+		if (AndroidStorage.isWritable(path))
+			return true;
+		#end
 		#if sys
 		if (!createDirectory(path))
 			return false;
@@ -619,12 +620,6 @@ class StorageUtil
 		}
 		catch (e:Dynamic) {}
 		#end
-		if (isFontAsset(id))
-		{
-			var fontBytes = getEmbeddedFontBytes(id);
-			if (fontBytes != null)
-				return saveBytes(target, fontBytes);
-		}
 		try
 		{
 			return saveBytes(target, lime.utils.Assets.getBytes(id));
@@ -633,92 +628,7 @@ class StorageUtil
 		{
 			lastError = Std.string(e);
 		}
-		return isFontAsset(id);
-	}
-
-	public static function isFontAsset(id:String):Bool
-	{
-		try
-		{
-			if (lime.utils.Assets.isLocal(id, FONT) || lime.utils.Assets.exists(id, FONT))
-				return true;
-		}
-		catch (e:Dynamic) {}
-		var ext = Path.extension(id).toLowerCase();
-		return ext == "ttf" || ext == "otf";
-	}
-
-	public static function getEmbeddedFontBytes(id:String):Bytes
-	{
-		var key = flatName(id);
-		try
-		{
-			for (name in haxe.Resource.listNames())
-			{
-				if (!name.startsWith("LIME_font_"))
-					continue;
-				if (flatName(name).endsWith(key))
-				{
-					var bytes = haxe.Resource.getBytes(name);
-					if (bytes != null && bytes.length > 0)
-						return bytes;
-				}
-			}
-		}
-		catch (e:Dynamic)
-		{
-			lastError = Std.string(e);
-		}
-		return null;
-	}
-
-	static function flatName(value:String):String
-	{
-		var buf = new StringBuf();
-		for (i in 0...value.length)
-		{
-			var c = value.charCodeAt(i);
-			var alnum = (c >= "a".code && c <= "z".code) || (c >= "A".code && c <= "Z".code) || (c >= "0".code && c <= "9".code);
-			if (alnum)
-				buf.addChar(c);
-		}
-		return buf.toString().toLowerCase();
-	}
-
-	public static function startBatchCopy(jobs:String, threads:Int):Bool
-	{
-		#if android
-		return AndroidStorage.startBatchCopy(jobs, threads);
-		#else
 		return false;
-		#end
-	}
-
-	public static function getBatchCompleted():Int
-	{
-		#if android
-		return AndroidStorage.getBatchCompleted();
-		#else
-		return 0;
-		#end
-	}
-
-	public static function isBatchRunning():Bool
-	{
-		#if android
-		return AndroidStorage.isBatchRunning();
-		#else
-		return false;
-		#end
-	}
-
-	public static function getBatchFailed():String
-	{
-		#if android
-		return AndroidStorage.getBatchFailed();
-		#else
-		return "";
-		#end
 	}
 
 	public static function getFreeSpace(?path:String):Float
@@ -756,11 +666,11 @@ class StorageUtil
 #if android
 class AndroidStorage
 {
-	public static function getExternalStorageDirectory():String
+	public static function getPath(location:androidmanager.content.Storage.StorageLocation, ?subfolder:String):String
 	{
 		try
 		{
-			return androidmanager.content.Storage.getPath(androidmanager.content.Storage.StorageLocation.ROOT);
+			return androidmanager.content.Storage.getPath(location, subfolder);
 		}
 		catch (e:Dynamic)
 		{
@@ -768,15 +678,15 @@ class AndroidStorage
 		}
 	}
 
-	public static function getExternalMediaDirectory():String
+	public static function isMounted():Bool
 	{
 		try
 		{
-			return Context.getExternalMediaDir();
+			return androidmanager.content.Storage.available && androidmanager.content.Storage.writable;
 		}
 		catch (e:Dynamic)
 		{
-			return null;
+			return true;
 		}
 	}
 
@@ -792,14 +702,59 @@ class AndroidStorage
 		}
 	}
 
-	public static function requestStoragePermission()
+	public static function requestStoragePermission(?callback:Bool->Void)
 	{
 		try
 		{
-			if (!hasStoragePermission())
-				androidmanager.tools.PermissionUtils.requestManageExternalStorage();
+			if (hasStoragePermission())
+			{
+				if (callback != null)
+					callback(true);
+				return;
+			}
+			androidmanager.tools.PermissionUtils.requestManageExternalStorage(callback);
 		}
-		catch (e:Dynamic) {}
+		catch (e:Dynamic)
+		{
+			if (callback != null)
+				callback(false);
+		}
+	}
+
+	public static function isWritable(path:String):Bool
+	{
+		try
+		{
+			return androidmanager.content.Storage.isWritable(path);
+		}
+		catch (e:Dynamic)
+		{
+			return false;
+		}
+	}
+
+	public static function createNoMedia(path:String):Bool
+	{
+		try
+		{
+			return androidmanager.content.Storage.createNoMedia(path);
+		}
+		catch (e:Dynamic)
+		{
+			return false;
+		}
+	}
+
+	public static function getSize(path:String):Float
+	{
+		try
+		{
+			return androidmanager.content.Storage.getSize(path);
+		}
+		catch (e:Dynamic)
+		{
+			return -1;
+		}
 	}
 
 	public static function copyAsset(assetPath:String, targetPath:String):Bool
@@ -811,62 +766,6 @@ class AndroidStorage
 		catch (e:Dynamic)
 		{
 			return false;
-		}
-	}
-
-	public static function startBatchCopy(jobs:String, threads:Int):Bool
-	{
-		try
-		{
-			var list:Array<androidmanager.content.Assets.AssetCopyJob> = [];
-			if (jobs != null && jobs.length > 0)
-				for (line in jobs.split("\n"))
-				{
-					var parts = line.split("\t");
-					if (parts.length == 3)
-						list.push({source: parts[1], target: parts[2], fromFile: parts[0] == "F", id: line});
-				}
-			return androidmanager.content.Assets.batch(list, threads);
-		}
-		catch (e:Dynamic)
-		{
-			return false;
-		}
-	}
-
-	public static function getBatchCompleted():Int
-	{
-		try
-		{
-			return androidmanager.content.Assets.batchCompleted;
-		}
-		catch (e:Dynamic)
-		{
-			return 0;
-		}
-	}
-
-	public static function isBatchRunning():Bool
-	{
-		try
-		{
-			return androidmanager.content.Assets.batchRunning;
-		}
-		catch (e:Dynamic)
-		{
-			return false;
-		}
-	}
-
-	public static function getBatchFailed():String
-	{
-		try
-		{
-			return [for (job in androidmanager.content.Assets.getFailed()) Std.string(job.id)].join("\n");
-		}
-		catch (e:Dynamic)
-		{
-			return "";
 		}
 	}
 

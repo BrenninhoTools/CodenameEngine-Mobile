@@ -18,7 +18,7 @@ class StoragePermissionState extends FlxState
 	{
 		super.create();
 
-		infoText = new FlxText(40, 0, FlxG.width - 80, "Codename Engine keeps its assets and mods in the .CodenameEngine folder.\nAllow \"All files access\" to use it.", 28);
+		infoText = new FlxText(40, 0, FlxG.width - 80, "Codename Engine keeps its mods in the .CodenameEngine folder.\nAllow \"All files access\" to use it.", 28);
 		infoText.alignment = CENTER;
 		infoText.screenCenter(Y);
 		add(infoText);
@@ -36,7 +36,7 @@ class StoragePermissionState extends FlxState
 		if (!requested)
 		{
 			requested = true;
-			StorageUtil.requestStoragePermission();
+			StorageUtil.requestStoragePermission((granted:Bool) -> if (granted) finish(true));
 		}
 
 		checkTimer -= elapsed;
