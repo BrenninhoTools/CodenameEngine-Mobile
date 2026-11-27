@@ -44,7 +44,31 @@ class VideoCutscene extends Cutscene {
 	public function new(path:String, callback:Void->Void) {
 		super(callback, false);
 		localPath = Assets.getPath(this.path = path);
+		#if android
+		localPath = prepareAndroidVideo(localPath);
+		#end
 	}
+
+	#if android
+	static function prepareAndroidVideo(path:String):String
+	{
+		if (path == null || path.length == 0)
+			return path;
+		try
+		{
+			if (sys.FileSystem.exists(path))
+				return path;
+			var cache = androidmanager.content.Context.getCacheDir();
+			if (cache == null)
+				return path;
+			var target = haxe.io.Path.addTrailingSlash(cache) + "videos/" + funkin.mobile.CopyState.getVersionKey() + "/" + haxe.io.Path.withoutDirectory(path);
+			if (sys.FileSystem.exists(target) || androidmanager.content.Assets.copy(path, target))
+				return target;
+		}
+		catch (e:Dynamic) {}
+		return path;
+	}
+	#end
 
 	public override function create() {
 		super.create();

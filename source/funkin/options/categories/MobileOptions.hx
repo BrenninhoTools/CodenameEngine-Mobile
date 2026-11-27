@@ -29,7 +29,7 @@ class MobileOptions extends TreeMenuScreen {
 		}));
 		add(new TextOption(getNameID('reextractAssets'), getDescID('reextractAssets'), () -> {
 			StorageUtil.requestReextract();
-			funkin.backend.system.modules.AntiCrash.showNotice('Assets will be extracted again', 'Restart the game to apply.');
+			funkin.backend.system.modules.AntiCrash.showNotice('Mods will be extracted again', 'Restart the game to apply.');
 		}));
 		add(new TextOption(getNameID('resetModFiles'), getDescID('resetModFiles'), () -> {
 			var count = funkin.backend.assets.ModGuard.getBlocked().length;

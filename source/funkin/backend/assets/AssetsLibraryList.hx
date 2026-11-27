@@ -153,6 +153,11 @@ class AssetsLibraryList extends AssetLibrary {
 				for(e in lib.getFiles(folder))
 					content.pushOnce(e);
 			}
+			#if mobile
+			else
+				for(e in getEmbeddedFiles(l, folder))
+					content.pushOnce(e);
+			#end
 			#end
 		}
 		return content;
@@ -172,10 +177,68 @@ class AssetsLibraryList extends AssetLibrary {
 				for(e in lib.getFolders(folder))
 					content.pushOnce(e);
 			}
+			#if mobile
+			else
+				for(e in getEmbeddedFolders(l, folder))
+					content.pushOnce(e);
+			#end
 			#end
 		}
 		return content;
 	}
+
+	#if mobile
+	static var embeddedIndexes:haxe.ds.ObjectMap<AssetLibrary, EmbeddedIndex> = new haxe.ds.ObjectMap();
+
+	static function getEmbeddedIndex(library:AssetLibrary):EmbeddedIndex {
+		var index = embeddedIndexes.get(library);
+		if (index != null) return index;
+		index = {files: new Map(), folders: new Map()};
+		var ids:Array<String> = null;
+		try {
+			ids = library.list(null);
+		} catch(e:Dynamic) {}
+		if (ids != null) {
+			for (id in ids) {
+				var slash = id.lastIndexOf("/");
+				var folder = slash >= 0 ? id.substr(0, slash + 1) : "";
+				var files = index.files.get(folder);
+				if (files == null) index.files.set(folder, files = []);
+				files.pushOnce(id.substr(slash + 1));
+				while (folder.length > 0) {
+					var trimmed = folder.substr(0, folder.length - 1);
+					var parentSlash = trimmed.lastIndexOf("/");
+					var parent = parentSlash >= 0 ? trimmed.substr(0, parentSlash + 1) : "";
+					var folders = index.folders.get(parent);
+					if (folders == null) index.folders.set(parent, folders = []);
+					var name = trimmed.substr(parentSlash + 1);
+					if (folders.contains(name)) break;
+					folders.push(name);
+					folder = parent;
+				}
+			}
+		}
+		embeddedIndexes.set(library, index);
+		return index;
+	}
+
+	static inline function normalizeFolder(folder:String):String {
+		if (folder == null) return "";
+		while (folder.startsWith("./")) folder = folder.substr(2);
+		if (folder.length > 0 && !folder.endsWith("/")) folder += "/";
+		return folder;
+	}
+
+	static function getEmbeddedFiles(library:AssetLibrary, folder:String):Array<String> {
+		var files = getEmbeddedIndex(library).files.get(normalizeFolder(folder));
+		return files == null ? [] : files.copy();
+	}
+
+	static function getEmbeddedFolders(library:AssetLibrary, folder:String):Array<String> {
+		var folders = getEmbeddedIndex(library).folders.get(normalizeFolder(folder));
+		return folders == null ? [] : folders.copy();
+	}
+	#end
 
 	public function getSpecificAsset(id:String, type:String, source:AssetSource = BOTH):Dynamic {
 		if (!id.startsWith("assets/")) {
@@ -227,7 +290,9 @@ class AssetsLibraryList extends AssetLibrary {
 		}
 		#end
 
+		#if !mobile
 		__defaultLibraries.push(ModsFolder.loadLibraryFromFolder('assets', rootDirectory, true, null, SOURCE));
+		#end
 
 		#end
 
@@ -297,3 +362,10 @@ class AssetsLibraryList extends AssetLibrary {
 		return l;
 	}
 }
+
+#if mobile
+typedef EmbeddedIndex = {
+	var files:Map<String, Array<String>>;
+	var folders:Map<String, Array<String>>;
+}
+#end

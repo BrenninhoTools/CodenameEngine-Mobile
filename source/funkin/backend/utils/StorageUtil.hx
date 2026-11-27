@@ -212,7 +212,7 @@ class StorageUtil
 			for (type in [STORAGE_DATA, STORAGE_MEDIA, STORAGE_OBB])
 			{
 				var path = getDirectoryForType(type);
-				if (path != null && hasExtractedAssets(path))
+				if (path != null && hasExistingInstall(path))
 					return applyDetectedType(type);
 			}
 		}
@@ -242,23 +242,14 @@ class StorageUtil
 		return true;
 	}
 
-	public static function hasExtractedAssets(?path:String):Bool
+	public static function hasExistingInstall(?path:String):Bool
 	{
-		#if sys
 		if (path == null)
 			path = storageDirectory;
-		try
-		{
-			if (path == null)
-				return false;
-			var assets = Path.addTrailingSlash(path) + ASSETS_FOLDER + "/";
-			if (FileSystem.exists(assets + ".version"))
-				return true;
-			return FileSystem.exists(assets + "images") && FileSystem.exists(assets + "data") && FileSystem.exists(assets + "music");
-		}
-		catch (e:Dynamic) {}
-		#end
-		return false;
+		if (path == null)
+			return false;
+		path = Path.addTrailingSlash(path);
+		return funkin.mobile.CopyState.hasExtractedMods(path) || funkin.mobile.CopyState.hasLegacyAssets(path);
 	}
 
 	public static function hasStoragePermission():Bool
@@ -416,7 +407,8 @@ class StorageUtil
 			'Free space: ${formatSize(getFreeSpace())}',
 			'Mods: ${countFolders(getModsPath())}',
 			'Addons: ${countFolders(getAddonsPath())}',
-			'Assets extracted: ${hasExtractedAssets() ? "yes" : "no"}'
+			'Mods extracted: ${funkin.mobile.CopyState.hasExtractedMods() ? "yes" : "no"}',
+			'Assets: read from the app'
 		];
 		return lines.join("\n");
 	}

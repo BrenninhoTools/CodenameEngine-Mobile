@@ -14,7 +14,6 @@ import sys.io.File;
 
 private enum CopyKind
 {
-	ASSET;
 	BUNDLED;
 	MIGRATE;
 }
@@ -28,14 +27,13 @@ private typedef CopyJob =
 
 class CopyState extends FlxState
 {
-	public static final ASSETS_FOLDER:String = "assets/";
-	public static final VERSION_FILE:String = "assets/.version";
-	public static final BUNDLED_FOLDERS:Array<String> = ["mods/", "addons/"];
+	public static final VERSION_FILE:String = ".version";
+	public static final LEGACY_ASSETS_FOLDER:String = "assets";
+	public static final BUNDLED_FOLDERS:Array<String> = ["mods/"];
 
 	static inline var MAX_RETRIES:Int = 2;
 	static inline var FRAME_BUDGET:Float = 0.03;
 
-	static var _assetFiles:Array<String> = null;
 	static var _bundledFiles:Array<String> = null;
 
 	var jobs:Array<CopyJob> = [];
@@ -45,6 +43,10 @@ class CopyState extends FlxState
 	var attempt:Int = 0;
 	var overwrite:Bool = false;
 	var migrationSource:String = null;
+
+	var cleanupFiles:Array<String> = [];
+	var cleanupIndex:Int = 0;
+	var cleaning:Bool = false;
 
 	var statusText:FlxText;
 	var progressText:FlxText;
@@ -63,49 +65,59 @@ class CopyState extends FlxState
 		return needsCopy() ? CopyState : MainState;
 	}
 
-	static function collectAssetLists()
-	{
-		if (_assetFiles != null)
-			return;
-		_assetFiles = [];
-		_bundledFiles = [];
-		for (id in lime.utils.Assets.list())
-		{
-			if (id.startsWith(ASSETS_FOLDER))
-				_assetFiles.push(id);
-			else
-				for (folder in BUNDLED_FOLDERS)
-					if (id.startsWith(folder))
-					{
-						_bundledFiles.push(id);
-						break;
-					}
-		}
-	}
-
-	public static function getFilesToCopy():Array<String>
-	{
-		collectAssetLists();
-		return _assetFiles;
-	}
-
 	public static function getBundledFiles():Array<String>
 	{
-		collectAssetLists();
+		if (_bundledFiles != null)
+			return _bundledFiles;
+		_bundledFiles = [];
+		for (id in lime.utils.Assets.list())
+			for (folder in BUNDLED_FOLDERS)
+				if (id.startsWith(folder))
+				{
+					_bundledFiles.push(id);
+					break;
+				}
 		return _bundledFiles;
+	}
+
+	public static function hasExtractedMods(?root:String):Bool
+	{
+		#if sys
+		if (root == null)
+			root = StorageUtil.storageDirectory;
+		try
+		{
+			return root != null && FileSystem.exists(root + VERSION_FILE);
+		}
+		catch (e:Dynamic) {}
+		#end
+		return false;
+	}
+
+	public static function hasLegacyAssets(?root:String):Bool
+	{
+		#if sys
+		if (root == null)
+			root = StorageUtil.storageDirectory;
+		try
+		{
+			var path = root + LEGACY_ASSETS_FOLDER;
+			return root != null && FileSystem.exists(path) && FileSystem.isDirectory(path);
+		}
+		catch (e:Dynamic) {}
+		#end
+		return false;
 	}
 
 	static function isVersionOutdated():Bool
 	{
 		#if sys
-		var versionPath = StorageUtil.storageDirectory + VERSION_FILE;
 		try
 		{
-			if (!FileSystem.exists(versionPath))
+			var path = StorageUtil.storageDirectory + VERSION_FILE;
+			if (!FileSystem.exists(path))
 				return true;
-			var stored = File.getContent(versionPath).trim();
-			var key = getVersionKey();
-			return stored != key && !stored.endsWith("-" + key);
+			return File.getContent(path).trim() != getVersionKey();
 		}
 		catch (e:Dynamic)
 		{
@@ -148,28 +160,25 @@ class CopyState extends FlxState
 		#if (sys && mobile)
 		if (StorageUtil.isReextractRequested())
 			return true;
-		if (!StorageUtil.hasExtractedAssets())
+		if (hasLegacyAssets())
 		{
-			Logs.trace('[CopyState] No assets found in ${StorageUtil.storageDirectory}, extracting', INFO);
+			Logs.trace('[CopyState] Old extracted assets found in ${StorageUtil.storageDirectory}, removing them', INFO);
+			return true;
+		}
+		if (!hasExtractedMods())
+		{
+			Logs.trace('[CopyState] Mods were not extracted to ${StorageUtil.storageDirectory} yet', INFO);
 			return true;
 		}
 		if (StorageUtil.getPreviousDirectory() != null)
 			return true;
-
-		var files = getFilesToCopy();
-		var outdated = isVersionOutdated();
-		var step = outdated ? 1 : Std.int(Math.max(1, files.length / 40));
-		var i = 0;
-		while (i < files.length)
+		if (isVersionOutdated())
 		{
-			var id = files[i];
-			if (!StorageUtil.isFontAsset(id) && missing(id))
-				return true;
-			i += step;
-		}
-		if (outdated)
+			for (id in getBundledFiles())
+				if (missing(id))
+					return true;
 			writeVersion();
-		Logs.trace('[CopyState] Assets already present in ${StorageUtil.storageDirectory}, skipping extraction', INFO);
+		}
 		StorageUtil.saveCurrentDirectory();
 		#end
 		return false;
@@ -182,14 +191,16 @@ class CopyState extends FlxState
 		#if (sys && mobile)
 		var root = StorageUtil.storageDirectory;
 		overwrite = StorageUtil.isReextractRequested();
-		var fresh = !StorageUtil.hasExtractedAssets();
+		var fresh = !hasExtractedMods();
 
-		for (id in getFilesToCopy())
-			if (overwrite || fresh || missing(id))
-				jobs.push({kind: ASSET, source: id, target: root + id});
+		if (hasLegacyAssets())
+		{
+			cleanupFiles = StorageUtil.listFiles(root, LEGACY_ASSETS_FOLDER);
+			cleaning = true;
+		}
 
 		for (id in getBundledFiles())
-			if (fresh || missing(id))
+			if (overwrite || fresh || missing(id))
 				jobs.push({kind: BUNDLED, source: id, target: root + id});
 
 		migrationSource = StorageUtil.getPreviousDirectory();
@@ -197,10 +208,6 @@ class CopyState extends FlxState
 			for (file in StorageUtil.getMigrationFiles())
 				if (!file.endsWith(".tmp") && missing(file))
 					jobs.push({kind: MIGRATE, source: migrationSource + file, target: root + file});
-		#end
-
-		#if android
-		startBatch();
 		#end
 
 		statusText = new FlxText(0, FlxG.height * 0.4, FlxG.width, getStatus(), 32);
@@ -218,16 +225,22 @@ class CopyState extends FlxState
 		progressText = new FlxText(0, progressBack.y + 40, FlxG.width, "", 20);
 		progressText.alignment = CENTER;
 		add(progressText);
+
+		#if android
+		if (!cleaning)
+			startBatch();
+		#end
 	}
 
 	function getStatus():String
 	{
+		if (cleaning)
+			return "Removing old extracted assets...";
 		if (attempt > 0)
 			return "Retrying failed files...";
 		if (index < jobs.length)
 			return switch (jobs[index].kind)
 			{
-				case ASSET: "Extracting assets...";
 				case BUNDLED: "Extracting mods...";
 				case MIGRATE: "Moving mods to the new storage...";
 			}
@@ -240,6 +253,12 @@ class CopyState extends FlxState
 
 		if (finished)
 			return;
+
+		if (cleaning)
+		{
+			updateCleanup();
+			return;
+		}
 
 		#if android
 		if (batchActive)
@@ -260,8 +279,7 @@ class CopyState extends FlxState
 		}
 		#end
 
-		var progress = jobs.length == 0 ? 1 : index / jobs.length;
-		progressBar.scale.x = progress;
+		progressBar.scale.x = jobs.length == 0 ? 1 : index / jobs.length;
 		statusText.text = getStatus();
 		progressText.text = '$index / ${jobs.length}' + (retryJobs.length > 0 ? ' (${retryJobs.length} to retry)' : '');
 
@@ -283,6 +301,38 @@ class CopyState extends FlxState
 		}
 	}
 
+	function updateCleanup()
+	{
+		#if sys
+		var root = StorageUtil.storageDirectory;
+		var start = haxe.Timer.stamp();
+		while (cleanupIndex < cleanupFiles.length && haxe.Timer.stamp() - start < FRAME_BUDGET)
+		{
+			try
+			{
+				FileSystem.deleteFile(root + cleanupFiles[cleanupIndex]);
+			}
+			catch (e:Dynamic) {}
+			cleanupIndex++;
+		}
+
+		progressBar.scale.x = cleanupFiles.length == 0 ? 1 : cleanupIndex / cleanupFiles.length;
+		statusText.text = getStatus();
+		progressText.text = '$cleanupIndex / ${cleanupFiles.length}';
+
+		if (cleanupIndex < cleanupFiles.length)
+			return;
+
+		StorageUtil.deleteDirectory(root + LEGACY_ASSETS_FOLDER);
+		Logs.trace('[CopyState] Removed ${cleanupFiles.length} old extracted asset files', INFO);
+		#end
+		cleaning = false;
+		cleanupFiles = [];
+		#if android
+		startBatch();
+		#end
+	}
+
 	#if android
 	static inline var BATCH_THREADS:Int = 4;
 
@@ -290,6 +340,7 @@ class CopyState extends FlxState
 	var batchLines:Map<String, CopyJob> = [];
 	var batchTotal:Int = 0;
 	var batchStart:Float = 0;
+	var batchHasMigration:Bool = false;
 
 	function startBatch()
 	{
@@ -300,18 +351,15 @@ class CopyState extends FlxState
 			var line:String = null;
 			switch (job.kind)
 			{
-				case ASSET, BUNDLED:
-					if (!StorageUtil.isFontAsset(job.source))
+				case BUNDLED:
+					var path:String = null;
+					try
 					{
-						var path:String = null;
-						try
-						{
-							path = lime.utils.Assets.getPath(job.source);
-						}
-						catch (e:Dynamic) {}
-						if (path != null && path.length > 0)
-							line = 'A\t$path\t${job.target}';
+						path = lime.utils.Assets.getPath(job.source);
 					}
+					catch (e:Dynamic) {}
+					if (path != null && path.length > 0)
+						line = 'A\t$path\t${job.target}';
 				case MIGRATE:
 					line = 'F\t${job.source}\t${job.target}';
 					batchHasMigration = true;
@@ -342,7 +390,7 @@ class CopyState extends FlxState
 		var completed = StorageUtil.getBatchCompleted();
 		var total = batchTotal + jobs.length;
 		progressBar.scale.x = total == 0 ? 1 : completed / total;
-		statusText.text = getBatchStatus();
+		statusText.text = batchHasMigration ? "Moving mods to the new storage..." : "Extracting mods...";
 		progressText.text = '$completed / $total';
 
 		if (StorageUtil.isBatchRunning())
@@ -361,15 +409,10 @@ class CopyState extends FlxState
 					failedCount++;
 				}
 			}
-		Logs.trace('[CopyState] Copied ${batchTotal - failedCount}/$batchTotal files in ${Math.round((haxe.Timer.stamp() - batchStart) * 1000)}ms using $BATCH_THREADS threads, ${jobs.length} left for the fallback copier', INFO);
+		Logs.trace('[CopyState] Copied ${batchTotal - failedCount}/$batchTotal files in ${Math.round((haxe.Timer.stamp() - batchStart) * 1000)}ms, ${jobs.length} left for the fallback copier', INFO);
 		batchLines.clear();
 		index = 0;
 	}
-
-	var batchHasMigration:Bool = false;
-
-	function getBatchStatus():String
-		return batchHasMigration ? "Moving mods to the new storage..." : "Extracting assets...";
 	#end
 
 	function runJob(job:CopyJob):Bool
@@ -377,7 +420,7 @@ class CopyState extends FlxState
 		#if (sys && mobile)
 		return switch (job.kind)
 		{
-			case ASSET, BUNDLED: StorageUtil.copyAsset(job.source, job.target);
+			case BUNDLED: StorageUtil.copyAsset(job.source, job.target);
 			case MIGRATE: StorageUtil.copyFile(job.source, job.target);
 		}
 		#else
@@ -395,25 +438,16 @@ class CopyState extends FlxState
 
 		#if (sys && mobile)
 		var root = StorageUtil.storageDirectory;
-		StorageUtil.cleanTempFiles(root, "assets");
-		var assetsFailed = false;
+		for (folder in StorageUtil.USER_FOLDERS)
+			StorageUtil.cleanTempFiles(root, folder);
 		for (job in failedJobs)
-		{
 			funkin.mobile.MobileLog.write('[CopyState] Failed to copy ${job.source} -> ${job.target}' + (StorageUtil.lastError != null ? ' (${StorageUtil.lastError})' : ''));
-			if (job.kind == ASSET)
-				assetsFailed = true;
-		}
 
-		if (!assetsFailed)
-		{
-			writeVersion();
-			StorageUtil.clearReextract();
-		}
-
+		writeVersion();
+		StorageUtil.clearReextract();
 		StorageUtil.saveCurrentDirectory();
 		#end
 
-		_assetFiles = null;
 		_bundledFiles = null;
 
 		if (failedJobs.length > 0)
